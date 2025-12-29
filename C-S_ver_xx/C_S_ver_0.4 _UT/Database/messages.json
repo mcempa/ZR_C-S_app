@@ -1,0 +1,103 @@
+{
+    "messages": [
+        {
+            "id": 1736883811811719,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hej",
+            "send_time": "2025-01-16T20:43:31.811719",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1736883811811720,
+            "username": "magda",
+            "sender": "anna",
+            "text": "jak leci",
+            "send_time": "2025-01-16T20:43:31.811719",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1736883811811721,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hello",
+            "send_time": "2025-01-16T21:43:31.811719",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1736883811811722,
+            "username": "magda",
+            "sender": "anna",
+            "text": "pomidor",
+            "send_time": "2025-01-16 T 20:45",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1736883811811723,
+            "username": "magda",
+            "sender": "anna",
+            "text": "wiosna",
+            "send_time": "2025-01-16 T 20:43",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1736883811811724,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hej",
+            "send_time": "2025-01-16 T 20:43",
+            "is_read": 1,
+            "read_time": "2025-01-26 godz. 20:51"
+        },
+        {
+            "id": 1737921175962,
+            "username": "magda",
+            "sender": "anna",
+            "text": "cześć czołem kluski z rosołem",
+            "send_time": "2025-01-26 godz. 20:52",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1737925704111,
+            "username": "iza",
+            "sender": "anna",
+            "text": "test",
+            "send_time": "2025-01-26 godz. 22:08",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1737925704115,
+            "username": "anna",
+            "sender": "iza",
+            "text": "test",
+            "send_time": "2025-01-26 godz. 22:08",
+            "read_time": "2025-01-26 godz. 22:52",
+            "is_read": 1
+        },
+        {
+            "id": 1737925704116,
+            "text": "New test message",
+            "username": "test_user",
+            "sender": "new_sender",
+            "send_time": "2025-05-04 godz. 20:16",
+            "is_read": 1,
+            "read_time": "2025-05-04 godz. 20:17"
+        },
+        {
+            "id": 1737925704117,
+            "text": "New test message",
+            "username": "test_user",
+            "sender": "new_sender",
+            "send_time": "2025-05-04 godz. 20:17",
+            "is_read": 0,
+            "read_time": null
+        }
+    ]
+}

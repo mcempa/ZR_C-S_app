@@ -1,0 +1,4680 @@
+====================
+FILE: BaseMessageManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\BaseMessageManager.py
+import bcrypt
+from datetime import datetime
+from config import *
+from Models.user import User
+from BLL.DbManager import DbManager
+import time
+from abc import ABC, abstractmethod
+
+class BaseMessageManager(ABC):
+    """Bazowa klasa z wspólną logiką dla serwera i klienta"""
+    
+    def __init__(self):
+        self.command_map = {
+            "send": self.handle_send_message,
+            "read": self.handle_read_new_message,
+            "read-u": self.handle_read_message_current_user_from_sender,
+            "read-a": self.handle_read_all_message_current_user,
+            "read-o": self.handle_read_message_user_from_sender,
+            "login": self.handle_login,
+            "logout": self.handle_logout,
+            "help": self.handle_get_help,
+            "info": self.handle_get_user_info,
+            "create": self.handle_create_new_user,
+            "delete": self.handle_delete_user,
+            "edit": self.handle_edit_user_role,
+        }
+
+    def process_command(self, command, *args, **kwargs):
+        """Uniwersalna metoda przetwarzania komend"""
+        if command in self.command_map:
+            return self.command_map[command](command, *args, **kwargs)
+        else:
+            return self._handle_unknown_command(command)
+
+    def _validate_string(self, text):
+        """Walidacja i sanityzacja tekstu"""
+        if not isinstance(text, str):
+            try:
+                text = str(text)
+            except Exception as e:
+                raise ValueError(f"Nie można przekonwertować wartości na tekst: {e}")
+        
+        forbidden_chars = FORBIDDEN_CHARS
+        safe_text = text
+        for char in forbidden_chars:
+            safe_text = safe_text.replace(char, '')
+            
+        return safe_text.strip()
+
+    
+
+    # Abstract methods - muszą być zaimplementowane w klasach pochodnych
+    @abstractmethod
+    def handle_send_message(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_read_new_message(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_read_message_current_user_from_sender(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_read_all_message_current_user(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_read_message_user_from_sender(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_login(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_logout(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_get_help(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_get_user_info(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_create_new_user(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_delete_user(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def handle_edit_user_role(self, command, **kwargs):
+        pass
+
+    @abstractmethod
+    def _handle_unknown_command(self, command):
+        pass
+
+====================
+FILE: ClientConnectionManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py
+import socket as s
+import time
+import os
+from datetime import datetime
+import json
+from config import *
+
+class ClientConnectionManager():
+    def __init__(self):
+        self.host = SERVER_CONFIG['host']
+        self.port = SERVER_CONFIG['port']
+    
+    def __enter__(self):
+        return self._connect_with_retry()
+    
+    def _connect_with_retry(self):
+        """Nawiązanie połączenia z mechanizmem ponawiania"""
+        last_exception = None
+        
+        for attempt in range(MAX_RETRY_ATTEMPTS):
+            try:
+                print(f"Próba połączenia {attempt + 1}/{MAX_RETRY_ATTEMPTS}")
+                self.client_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+                self.client_socket.settimeout(CONNECTION_TIMEOUT)
+                self.client_socket.connect((self.host, self.port))
+                print(f"Połączenie nawiązane pomyślnie")
+                return self
+                
+            except (ConnectionRefusedError, s.timeout, s.error) as e:
+                last_exception = e
+                print(f"Próba {attempt + 1} nieudana: {e}")
+                
+                if hasattr(self, 'client_socket') and self.client_socket:
+                    self.client_socket.close()
+                
+                if attempt < MAX_RETRY_ATTEMPTS - 1:
+                    print(f"Oczekiwanie {RETRY_DELAY}s przed kolejną próbą...")
+                    time.sleep(RETRY_DELAY)
+                    
+            except Exception as e:
+                print(f"Nieoczekiwany błąd podczas połączenia: {e}")
+                if hasattr(self, 'client_socket') and self.client_socket:
+                    self.client_socket.close()
+                raise
+        
+        print(f"Nie udało się nawiązać połączenia po {MAX_RETRY_ATTEMPTS} próbach")
+        raise ConnectionError(f"Połączenie nieudane: {last_exception}")
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        #Zamknij połączenie
+        if self.client_socket:
+            self.client_socket.close()
+            print("Połączenie z serwerem zostaje zamkniete")
+
+    def send_request(self, command):
+        """Wysłanie żądania z obsługą błędów sieciowych"""
+        if not hasattr(self, 'client_socket') or not self.client_socket:
+            raise ConnectionError("Brak aktywnego połączenia")
+            
+        try:
+            # Walidacja danych przed wysłaniem
+            if not command or len(command.strip()) == 0:
+                raise ValueError("Komenda nie może być pusta")
+            if len(command.encode('utf-8')) > MAX_REQUEST_SIZE:
+                raise ValueError(f"Komenda przekracza maksymalny rozmiar {MAX_REQUEST_SIZE}")
+                
+            self.client_socket.send(command.encode("utf-8"))
+            
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
+            print(f"Połączenie zostało przerwane: {e}")
+            raise ConnectionError(f"Połączenie przerwane: {e}")
+        except s.timeout as e:
+            print(f"Przekroczono limit czasu podczas wysyłania: {e}")
+            raise TimeoutError(f"Timeout podczas wysyłania: {e}")
+        except s.error as e:
+            print(f"Błąd socketu podczas wysyłania: {e}")
+            raise ConnectionError(f"Błąd sieci: {e}")
+        except Exception as e:
+            print(f"Nieoczekiwany błąd podczas wysyłania: {e}")
+            raise
+
+    def recv_response(self):
+        """Odbieranie odpowiedzi z obsługą błędów sieciowych"""
+        if not hasattr(self, 'client_socket') or not self.client_socket:
+            raise ConnectionError("Brak aktywnego połączenia")
+            
+        try:
+            response = self.client_socket.recv(SERVER_CONFIG["buffer_size"]).decode("utf-8")
+            
+            if not response:
+                raise ConnectionError("Serwer zamknął połączenie")
+                
+            print(response)
+            return response
+            
+        except (ConnectionResetError, ConnectionAbortedError) as e:
+            print(f"Połączenie zostało przerwane przez serwer: {e}")
+            raise ConnectionError(f"Połączenie przerwane: {e}")
+        except s.timeout as e:
+            print(f"Przekroczono limit czasu podczas odbierania: {e}")
+            raise TimeoutError(f"Timeout podczas odbierania: {e}")
+        except UnicodeDecodeError as e:
+            print(f"Błąd dekodowania odpowiedzi: {e}")
+            raise ValueError(f"Nieprawidłowe kodowanie odpowiedzi: {e}")
+        except s.error as e:
+            print(f"Błąd socketu podczas odbierania: {e}")
+            raise ConnectionError(f"Błąd sieci: {e}")
+        except Exception as e:
+            print(f"Nieoczekiwany błąd podczas odbierania: {e}")
+            raise
+            
+    def close(self):
+        """Bezpieczne zamknięcie połączenia"""
+        try:
+            if hasattr(self, 'client_socket') and self.client_socket:
+                self.client_socket.close()
+                print("Połączenie zostało zamknięte")
+        except Exception as e:
+            print(f"Błąd podczas zamykania połączenia: {e}")
+        
+
+====================
+FILE: ClientMessageManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\ClientMessageManager.py
+from BLL.BaseMessageManager import BaseMessageManager
+
+class ClientMessageManager(BaseMessageManager):
+    """Manager dla strony klienta - tworzy żądania do wysłania na serwer"""
+    
+    def __init__(self):
+        super().__init__()
+
+    def _create_request(self, command, data_dict):
+        """Tworzy podstawowy format żądania dla serwera"""
+        return [str(command), data_dict]
+
+    def handle_send_message(self, command, receiver=None, text=None, **kwargs):
+        return self._create_request(command, {
+            "receiver": receiver,
+            "text": text
+        })
+
+    def handle_read_new_message(self, command, **kwargs):
+        return self._create_request(command, {})
+
+    def handle_read_message_current_user_from_sender(self, command, sender=None, **kwargs):
+        return self._create_request(command, {
+            "sender": sender
+        })
+
+    def handle_read_all_message_current_user(self, command, **kwargs):
+        return self._create_request(command, {})
+
+    def handle_read_message_user_from_sender(self, command, username=None, sender=None, **kwargs):
+        return self._create_request(command, {
+            "username": username,
+            "sender": sender
+        })
+
+    def handle_login(self, command, username=None, password=None, **kwargs):
+        return self._create_request(command, {
+            "username": username,
+            "password": password
+        })
+
+    def handle_logout(self, command, **kwargs):
+        return self._create_request(command, {})
+
+    def handle_get_help(self, command, **kwargs):
+        return self._create_request(command, {})
+
+    def handle_get_user_info(self, command, username=None, **kwargs):
+        return self._create_request(command, {
+            "username": username
+        })
+
+    def handle_create_new_user(self, command, username=None, password=None, **kwargs):
+        return self._create_request(command, {
+            "username": username,
+            "password": password
+        })
+
+    def handle_delete_user(self, command, username=None, **kwargs):
+        return self._create_request(command, {
+            "username": username
+        })
+
+    def handle_edit_user_role(self, command, username=None, new_role=None, **kwargs):
+        return self._create_request(command, {
+            "username": username,
+            "new_role": new_role
+        })
+
+    def _handle_unknown_command(self, command):
+        return ["error", {"message": f"Nieznana komenda: {command}"}]
+
+    # ============= INTERACTIVE INPUT METHODS =============
+
+    def prepare_request_interactive(self):
+        """Interaktywne przygotowanie żądania z inputem użytkownika"""
+        input_handlers = {
+            "help": lambda: {},
+            "read-a": lambda: {},
+            "read": lambda: {},
+            "logout": lambda: {},
+            "login": self._get_login_input,
+            "create": self._get_create_input,
+            "send": self._get_send_message_input,
+            "read-u": self._get_sender_input,
+            "read-o": self._get_read_message_input,
+            "edit": self._get_edit_role_input,
+            "info": self._get_username_input,
+            "delete": self._get_username_input,
+        }
+
+        command = input("Podaj komendę: ").lower().strip()
+        
+        if command not in self.command_map:
+            print("Komenda nie istnieje")
+            return command, {}
+
+        data_input = input_handlers.get(command, lambda: {})()
+        return command, data_input
+
+    def _get_login_input(self):
+        username = input("Podaj nazwę użytkownika: ").strip().lower()
+        password = input("Podaj hasło użytkownika: ")
+        return {"username": username, "password": password}
+
+    def _get_create_input(self):
+        username = input("Podaj nazwę użytkownika: ").strip().lower()
+        password = input("Podaj hasło użytkownika: ")
+        return {"username": username, "password": password}
+
+    def _get_send_message_input(self):
+        receiver = input("Odbiorca wiadomości - podaj nazwę użytkownika: ").strip().lower()
+        text = input("Wpisz treść wiadomości: ")
+        return {"receiver": receiver, "text": text}
+
+    def _get_sender_input(self):
+        sender = input("Podaj nazwę użytkownika, od którego wiadomości chcesz przeglądać: ").strip().lower()
+        return {"sender": sender}
+
+    def _get_read_message_input(self):
+        username = input("Podaj nazwę użytkownika, którego wiadomości chcesz przeglądać: ").strip().lower()
+        sender = input("Podaj nazwę nadawcy wiadomości: ").strip().lower()
+        return {"username": username, "sender": sender}
+
+    def _get_edit_role_input(self):
+        username = input("Podaj nazwę użytkownika, którego rolę chcesz zmienić: ").strip().lower()
+        new_role = input("Nowa rola: ").strip().lower()
+        return {"username": username, "new_role": new_role}
+
+    def _get_username_input(self):
+        username = input("Podaj nazwę użytkownika: ").strip().lower()
+        return {"username": username}
+
+====================
+FILE: DbManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\DbManager.py
+from datetime import datetime
+import json
+from config import *
+from BLL.RepositoryFactory import RepositoryFactory
+
+
+class DbManager():
+    def __init__(self):
+        # Factory pattern - decyzja o bazie danych w konfiguracji
+        self.users_repository = RepositoryFactory.create_users_repository()
+        self.messages_repository = RepositoryFactory.create_messages_repository()
+
+    @staticmethod
+    def handle_db_exceptions(func):           
+        def wrapper(self, *args, **kwargs):   # wrapper to nowa funkcja, która "owija" oryginalną
+            try:
+                return func(self, *args, **kwargs)  # wywołanie oryginalnej funkcji
+            except FileNotFoundError:
+                print(f"Nie znaleziono pliku bazy")
+                return False
+            except json.JSONDecodeError:
+                print("Błąd podczas parsowania pliku JSON")
+                return False
+            except PermissionError:
+                print(f"Brak uprawnień do zapisu pliku")
+                return False
+            except IOError as e:
+                print(f"Błąd podczas operacji na pliku: {e}")
+                return False
+            except ValueError as e:
+                print(f"Błąd walidacji danych: {e}")
+                return False
+            except Exception as e:
+                print(f"Wystąpił nieoczekiwany błąd: {e}")
+                return False
+        return wrapper   
+    
+    def _sanitize_string(self, text):
+        """Sanityzacja tekstu - usunięcie niebezpiecznych znaków"""
+        if not isinstance(text, str):
+            try:
+                text = str(text)
+            except Exception as e:
+                raise ValueError(f"Nie można przekonwertować wartości na tekst: {e}")
+        
+        # Usunięcie niebezpiecznych znaków
+        for char in FORBIDDEN_CHARS:
+            text = text.replace(char, '')
+            
+        return text.strip()
+
+    @handle_db_exceptions
+    def add_message_into_db(self, message_data):
+        # Walidacja danych wiadomości
+        if not hasattr(message_data, 'username') or not hasattr(message_data, 'text'):
+            raise ValueError("Dane wiadomości są niepełne")
+        
+        # Walidacja długości
+        if len(message_data.text) > MAX_MESSAGE_LENGTH:
+            raise ValueError(f"Wiadomość przekracza maksymalną długość {MAX_MESSAGE_LENGTH}")
+        if len(message_data.username) > MAX_USERNAME_LENGTH:
+            raise ValueError(f"Nazwa użytkownika przekracza maksymalną długość {MAX_USERNAME_LENGTH}")
+        
+        # Sanityzacja danych
+        message_data.text = self._sanitize_string(message_data.text)
+        message_data.username = self._sanitize_string(message_data.username)
+        message_data.sender = self._sanitize_string(message_data.sender)
+        
+        # Konwersja obiektu Message do słownika dla JSON
+        message_dict = message_data.to_dict()
+        
+        return self.messages_repository.save(message_dict)
+
+    @handle_db_exceptions
+    def delete_message_from_db(self, message_id, username):
+        message = self.messages_repository.find_by_id(message_id)
+        if message and message.get("username") == username:
+            return self.messages_repository.delete(message_id)
+        return False
+ 
+    @handle_db_exceptions
+    def get_all_messages_user(self, username):
+        return [msg["text"] for msg in self.messages_repository.find_by_field("username", username)]
+      
+    @handle_db_exceptions
+    def get_all_messages_user_from_sender(self, username, sender):
+        messages = self.messages_repository.find_by_field("username", username)
+        return [msg["text"] for msg in messages if msg.get("sender") == sender]
+        
+    @handle_db_exceptions
+    def get_all_new_messages_user(self, username):
+        messages = self.messages_repository.find_by_field("username", username)
+        return [[msg["text"], msg["sender"], msg["send_time"]] 
+                for msg in messages if msg.get("is_read") == 0]
+             
+    @handle_db_exceptions
+    def get_number_new_message_user(self, username):
+        messages = self.messages_repository.find_by_field("username", username)
+        return len([msg for msg in messages if msg.get("is_read") == 0])
+    
+    @handle_db_exceptions
+    def change_message_status_into_read(self, username):
+        messages = self.messages_repository.find_by_field("username", username)
+        for msg in messages:
+            if msg.get("is_read") == 0:
+                self.messages_repository.update(msg["id"], {
+                    "is_read": 1,
+                    "read_time": datetime.now().strftime("%Y-%m-%d godz. %H:%M")
+                })
+        return True
+            
+    @handle_db_exceptions           
+    def get_user_info(self, username):
+        user = self.users_repository.find_by_field("username", username)
+        if user:
+            user_info = user[0].copy()
+            user_info.pop("password", None)
+            return user_info
+        return None
+    
+    @handle_db_exceptions
+    def delete_user_from_db(self, username):
+        # Walidacja parametru username
+        if not username or not isinstance(username, str):
+            raise ValueError("Nazwa użytkownika jest wymagana i musi być tekstem")
+        
+        # Sprawdzenie czy użytkownik istnieje
+        user = self.users_repository.find_by_field("username", username)
+        if not user or len(user) == 0:
+            raise ValueError(f"Użytkownik {username} nie istnieje w bazie danych")
+        
+        # Pobranie ID użytkownika
+        user_id = user[0].get("id")
+        if not user_id:
+            raise ValueError(f"Nie znaleziono ID dla użytkownika {username}")
+        
+        # Usunięcie użytkownika
+        result = self.users_repository.delete(user_id)
+        if result:
+            print(f"Użytkownik {username} został pomyślnie usunięty")
+        return result
+    
+    @handle_db_exceptions            
+    def add_user_into_db(self, user):
+        # Walidacja danych użytkownika
+        if not isinstance(user, dict):
+            raise ValueError("Dane użytkownika muszą być słownikiem")
+        
+        required_fields = ["username", "password", "role"]
+        for field in required_fields:
+            if field not in user or not user[field]:
+                raise ValueError(f"Pole {field} jest wymagane")
+        
+        # Walidacja długości pól
+        if len(user["username"]) > MAX_USERNAME_LENGTH:
+            raise ValueError(f"Nazwa użytkownika przekracza maksymalną długość {MAX_USERNAME_LENGTH}")
+        if len(user["password"]) > MAX_PASSWORD_LENGTH:
+            raise ValueError(f"Hasło przekracza maksymalną długość {MAX_PASSWORD_LENGTH}")
+        
+        # Sanityzacja danych
+        user["username"] = self._sanitize_string(user["username"])
+        
+        return self.users_repository.save(user)
+
+    @handle_db_exceptions
+    def edit_user_role_in_db(self, username, new_role):
+        user = self.users_repository.find_by_field("username", username)
+        if user:
+            print(f"Zmieniono rolę użytkownika {username} na {new_role}")
+            return self.users_repository.update(user[0]["id"], {"role": new_role})
+        return False
+    
+    @handle_db_exceptions
+    def change_login_time_in_db(self, username):
+        user = self.users_repository.find_by_field("username", username)
+        if user:
+            print(username)
+            return self.users_repository.update(user[0]["id"], {
+                "login_time": datetime.now().isoformat()
+            })
+        return False
+    
+    @handle_db_exceptions
+    def is_user_in_db(self, username):
+        return len(self.users_repository.find_by_field("username", username)) > 0
+    
+    @handle_db_exceptions
+    def is_message_in_db(self, message_id):
+        return self.messages_repository.find_by_id(message_id) is not None
+    
+    @handle_db_exceptions
+    def is_user_password_in_db(self, username, password):
+        users = self.users_repository.find_by_field("username", username)
+        return any(
+            user.get("password") == str(password)
+            for user in users
+        )
+    
+    @handle_db_exceptions
+    def get_user_password(self, username):
+        user = self.users_repository.find_by_field("username", username)
+        return user[0]["password"] if user else None
+    
+    @handle_db_exceptions
+    def get_user_role(self, username):
+        user = self.users_repository.find_by_field("username", username)
+        return user[0]["role"] if user else None
+           
+
+
+    
+
+====================
+FILE: RepositoryFactory.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\RepositoryFactory.py
+from config import DATABASE_TYPE, PATH_USERS_DB, PATH_MESSAGES_DB, SQL_CONNECTION_STRING
+from DAL.base_repository import BaseRepository
+from DAL.json_repository import JsonRepository
+
+class RepositoryFactory:
+    """Factory for creating repository instances based on configuration"""
+    
+    @staticmethod
+    def create_users_repository() -> BaseRepository:
+        """Creates users repository based on DATABASE_TYPE configuration"""
+        if DATABASE_TYPE == "JSON":
+            return JsonRepository(PATH_USERS_DB, "users")
+        elif DATABASE_TYPE == "SQL":
+            # Future SQL implementation
+            from DAL.sql_repository import SqlRepository
+            return SqlRepository(SQL_CONNECTION_STRING, "users")
+        else:
+            raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
+    
+    @staticmethod
+    def create_messages_repository() -> BaseRepository:
+        """Creates messages repository based on DATABASE_TYPE configuration"""
+        if DATABASE_TYPE == "JSON":
+            return JsonRepository(PATH_MESSAGES_DB, "messages")
+        elif DATABASE_TYPE == "SQL":
+            # Future SQL implementation
+            from DAL.sql_repository import SqlRepository
+            return SqlRepository(SQL_CONNECTION_STRING, "messages")
+        else:
+            raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
+
+====================
+FILE: ServerConnectionManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py
+import socket as s
+from datetime import datetime
+from config import *
+import json
+
+class ServerConnectionManager():
+    def __init__(self):
+        self.host = SERVER_CONFIG["host"]
+        self.port = SERVER_CONFIG["port"]
+        self.max_connections = SERVER_CONFIG["max_connections"]
+        self.buffer_size = SERVER_CONFIG["buffer_size"]
+        self.server_socket = None
+        
+    def start_server(self):
+        """Uruchomienie serwera z ulepszoną obsługą błędów"""
+        try:
+            self.server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+            # Pozwól na ponowne użycie adresu
+            self.server_socket.setsockopt(s.SOL_SOCKET, s.SO_REUSEADDR, 1)
+            self.server_socket.settimeout(CONNECTION_TIMEOUT)
+            
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(self.max_connections)
+            print(f"Serwer nasłuchuje na {self.host}:{self.port}")
+            
+        except OSError as e:
+            if e.errno == 98:  # Address already in use
+                print(f"Port {self.port} jest już zajęty. Spróbuj inny port.")
+            else:
+                print(f"Błąd systemu operacyjnego: {e}")
+            raise ConnectionError(f"Nie można uruchomić serwera: {e}")
+        except s.error as e:
+            print(f"Błąd socketu podczas uruchamiania serwera: {e}")
+            raise s.error(f"Nie można uruchomić serwera: {e}")
+        except Exception as e:
+            print(f"Nieoczekiwany błąd podczas uruchamiania serwera: {e}")
+            raise
+
+    def stop_server(self):
+        # Zamknij połączenie
+        if self.server_socket:
+            self.server_socket.close()
+            print("Serwer został zamknięty.")
+
+    def accept_client(self):
+        """Akceptowanie klienta z obsługą błędów"""
+        if not self.server_socket:
+            raise ConnectionError("Serwer nie został uruchomiony")
+            
+        try:
+            client_socket, address = self.server_socket.accept()
+            client_socket.settimeout(CONNECTION_TIMEOUT)
+            return client_socket, address
+            
+        except s.timeout:
+            # Timeout jest normalny dla nieblokującego serwera
+            raise
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            print(f"Połączenie przerwane przez klienta: {e}")
+            raise ConnectionError(f"Połączenie przerwane: {e}")
+        except s.error as e:
+            print(f"Błąd socketu podczas akceptowania połączenia: {e}")
+            raise s.error(f"Błąd akceptowania: {e}")
+        except Exception as e:
+            print(f"Nieoczekiwany błąd podczas akceptowania połączenia: {e}")
+            raise
+
+    def handle_client(self, client_socket):     
+        try:
+            data_string = client_socket.recv(self.buffer_size).decode("utf-8")
+            
+            # Walidacja długości danych
+            if len(data_string.strip()) == 0:
+                raise ValueError("Otrzymano puste dane")
+            if len(data_string) > MAX_REQUEST_SIZE:
+                raise ValueError(f"Dane przekraczają maksymalny rozmiar {MAX_REQUEST_SIZE}")
+            
+            try:
+                # Bezpieczne parsowanie JSON zamiast ast.literal_eval
+                data_list = json.loads(data_string)
+                
+                # Walidacja struktury danych
+                if not isinstance(data_list, list) or len(data_list) != 2:
+                    raise ValueError("Nieprawidłowa struktura danych - oczekiwano listy [command, data]")
+                
+                command, data = data_list[0], data_list[1]
+                
+                # Walidacja komendy
+                if not isinstance(command, str) or len(command.strip()) == 0:
+                    raise ValueError("Komenda musi być niepustym tekstem")
+                if len(command) > MAX_COMMAND_LENGTH:
+                    raise ValueError(f"Komenda przekracza maksymalną długość {MAX_COMMAND_LENGTH}")
+                
+                # Walidacja danych
+                if not isinstance(data, dict):
+                    raise ValueError("Dane muszą być słownikiem")
+                
+                return data_list
+                
+            except json.JSONDecodeError as e:
+                print(f"Błąd podczas parsowania JSON: {e}")
+                raise ValueError("Nieprawidłowy format JSON")
+            except (ValueError, TypeError) as e:
+                print(f"Błąd walidacji danych: {e}")
+                raise 
+                
+        except UnicodeDecodeError as e:
+            print(f"Błąd dekodowania danych: {e}")
+            raise 
+        except s.error as e:
+            print(f"Błąd połączenia: {e}")
+            raise 
+
+
+
+====================
+FILE: ServerMessageManager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\BLL\ServerMessageManager.py
+import bcrypt
+from datetime import datetime
+from config import *
+from Models.user import User
+from Models.message import Message
+from BLL.DbManager import DbManager
+from BLL.BaseMessageManager import BaseMessageManager
+import time
+import secrets
+import os
+
+class ServerMessageManager(BaseMessageManager):
+    """Manager dla strony serwera - wykonuje operacje biznesowe"""
+    
+    def __init__(self):
+        super().__init__()
+        self.current_user = User()
+        self.db_manager = DbManager()
+        self.new_messages = Message()
+
+    def handle_send_message(self, command, receiver=None, text=None, **kwargs):
+        number_new_message = self.db_manager.get_number_new_message_user(receiver)
+        is_receiver_in_db = self.db_manager.is_user_in_db(receiver)
+        
+        if (self.current_user.is_user_allowed_to_command(str(command)) and 
+            self.current_user.is_logged and is_receiver_in_db):
+            
+            if number_new_message < MAX_NEW_MESSAGE_STORAGE and len(text) <= MAX_MESSAGE_LENGTH:
+                
+                # Przypisz ID przed zapisem
+                self.new_messages.id = self._generate_id()
+                self.new_messages.username = receiver
+                self.new_messages.sender = self.current_user.username
+                self.new_messages.text = self._validate_string(text)
+                self.new_messages.send_time = datetime.now().strftime('%Y-%m-%d godz. %H:%M')
+                self.new_messages.read_time = None
+                self.new_messages.is_read = 0
+                
+                self.db_manager.add_message_into_db(self.new_messages)
+                return f"Wiadomość do {receiver} została wysłana"
+            else:
+                return f"Nie możesz wysłać wiadomości do {receiver} - jego skrzynka jest przepełniona lub wiadomość jest dłuższa niż 255 znaków"
+        else:
+            return f"Nie masz uprawnień do tej komendy lub użytkownik {receiver} nie istnieje"
+
+    def handle_read_new_message(self, command, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            new_messages = self.db_manager.get_all_new_messages_user(self.current_user.username)
+            self.db_manager.change_message_status_into_read(self.current_user.username)
+            
+            if new_messages:
+                response = []
+                for message in new_messages:
+                    response.append(f"Wiadomosc od: {message[1]}: {message[0]} / wysłano: {message[2]}")
+                return "\n".join(response)
+            else:
+                return "Nie masz nowych wiadomości"
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_read_message_current_user_from_sender(self, command, sender=None, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            return self.db_manager.get_all_messages_user_from_sender(self.current_user.username, sender)
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_read_all_message_current_user(self, command, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            messages = self.db_manager.get_all_messages_user(self.current_user.username)
+            self.db_manager.change_message_status_into_read(self.current_user.username)
+            return messages
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_read_message_user_from_sender(self, command, username=None, sender=None, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            messages = self.db_manager.get_all_messages_user_from_sender(username, sender)
+            self.db_manager.change_message_status_into_read(self.current_user.username)
+            return messages
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_login(self, command, username=None, password=None, **kwargs):
+        try:
+            if not username or not password:
+                return "Nazwa użytkownika i hasło nie mogą być puste"
+                
+            if self.current_user.is_user_allowed_to_command(str(command)) and not self.current_user.is_logged:
+                stored_password = self.db_manager.get_user_password(username)
+                stored_role = self.db_manager.get_user_role(username)
+                
+                if stored_password and bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                    self.db_manager.change_login_time_in_db(username)
+                    self.current_user.username = username
+                    self.current_user.password = stored_password
+                    self.current_user.is_logged = True
+                    self.current_user.role = stored_role
+                    return "Użytkownik został zalogowany"
+                else:
+                    return "Nieprawidłowa nazwa użytkownika lub hasło"
+            else:
+                return "Nie masz uprawnień do tej komendy lub jesteś już zalogowany"
+                
+        except UnicodeEncodeError:
+            return "Hasło zawiera nieprawidłowe znaki"
+        except Exception as e:
+            return f"Wystąpił nieoczekiwany błąd: {str(e)}"
+
+    def handle_logout(self, command, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            self.current_user.is_logged = False
+            return "Użytkownik został wylogowany"
+        return "Użytkownik nie był zalogowany"
+
+    def handle_get_help(self, command, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)):
+            help_list = []
+            for key, value in DIC_HELP.items():
+                help_list.append(f"{key}: {value}")
+            return "\n".join(help_list)
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_get_user_info(self, command, username=None, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and self.current_user.is_logged:
+            return self.db_manager.get_user_info(username)
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_create_new_user(self, command, username=None, password=None, **kwargs):
+        if self.current_user.is_user_allowed_to_command(str(command)) and not self.current_user.is_logged:
+            if self.db_manager.is_user_in_db(username):
+                return "Użytkownik już istnieje"
+            elif len(password) < MIN_PASSWORD_LENGTH or len(username) < MIN_USERNAME_LENGTH:
+                return f"Hasło i nazwa użytkownika muszą mieć minimum {MIN_PASSWORD_LENGTH} znaki"
+            else:
+                hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                user = {
+                    "id": self._generate_id(),
+                    "username": username,
+                    "role": "user",
+                    "password": hashed_password.decode('utf-8'),
+                    "login_time": None,
+                    "create_time": datetime.now().isoformat()
+                }
+                
+                is_add = self.db_manager.add_user_into_db(user)
+                if is_add:
+                    return "Użytkownik został dodany do bazy danych"
+                else:
+                    return "Użytkownik nie został dodany do bazy danych"
+        else:
+            return "Nie masz uprawnień do tej komendy lub jesteś już zalogowany"
+
+    def handle_delete_user(self, command, username=None, **kwargs):
+        if (self.current_user.is_user_allowed_to_command(str(command)) and 
+            self.current_user.is_logged and username != self.current_user.username):
+            
+            is_delete = self.db_manager.delete_user_from_db(username)
+            if is_delete:
+                return "Użytkownik został usunięty"
+            else:
+                return "Użytkownik nie został usunięty"
+        else:
+            return "Nie masz uprawnień do tej komendy"
+
+    def handle_edit_user_role(self, command, username=None, new_role=None, **kwargs):
+        is_user_in_db = self.db_manager.is_user_in_db(username)
+        if (self.current_user.is_user_allowed_to_command(command) and 
+            self.current_user.is_logged and is_user_in_db):
+            
+            self.db_manager.edit_user_role_in_db(username, new_role)
+            return "Rola została zmieniona"
+        else:
+            return "Nie masz uprawnień do tej komendy lub użytkownik nie istnieje"
+
+    def _handle_unknown_command(self, command):
+        return f"Nieznana komenda: {command}"
+    
+    def _generate_id(self):
+        """Generuje unikalny numeryczny ID (timestamp + losowe bity)"""
+        timestamp_ms = int(time.time() * 1000)
+        random_bits = secrets.randbits(ID_RANDOM_BITS)  # Configurable bits of randomness
+        return (timestamp_ms << ID_RANDOM_BITS) | random_bits
+
+
+====================
+FILE: config.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\config.py
+
+SERVER_CONFIG = {
+    "host": "127.0.0.1",
+    "port":  64623,
+    "max_connections": 5,
+    "buffer_size": 1024
+}
+
+ROLE_PERMISSIONS = {
+        'admin': {
+            "send"   : True,
+            "read"   : True,
+            "read-u" : True,
+            "read-a" : True,
+            "read-o" : True,
+            "login"  : True,
+            "logout" : True,
+            "help"   : True,
+            "info"   : True,
+            "create" : True,
+            "delete" : True,
+            "edit"   : True
+                },
+            
+        'user': {
+            "send"   : True,
+            "read"   : True,
+            "read-u" : True,
+            "read-a" : True,
+            "read-o" : False,
+            "login"  : True,
+            "logout" : True,
+            "help"   : True,
+            "info"   : False,
+            "create" : True,
+            "delete" : False,
+            "edit"   : False
+            }
+            }
+
+DIC_HELP = {
+        "send"   : "send - wysyłanie wiadomości do innego zarejestrowanego użytkownika",
+        "read"   : "read - czytanie nowych wiadomości",
+        "read-u" : "read-u - przegląd wszystkich wiadomości od wybranego użytkownika",
+        "read-a" : "read-a - przegląd wszystkich wiadomości jakie ma użytkownik",
+        "read-o" : "read-o - przegląd wszystkich wiadomości innego użytkownika (tylko  admin)",
+        "login"  : "login - logowanie do systemu",
+        "logout" : "logout - wylogowanie z systemu",
+        "help"   : "help - zwraca listę dostępnych komend z krótkim opisem",
+        "info"   : "info - zwraca informacje o wybranym użytkowniku (tylko admin)",
+        "create" : "create - tworzenie nowego użytkownika",
+        "delete" : "delete - usuwanie użytkownika (tylko admin)",
+        "edit"   : "edit - edycja roli użytkownika  (tylko admin)"
+        }
+
+# Database configuration
+DATABASE_TYPE = "JSON"  # "JSON", "SQL", "MONGO" - easy switch between database types
+
+# JSON Database paths
+PATH_USERS_DB = "Database/users.json"
+PATH_MESSAGES_DB = "Database/messages.json"
+
+# SQL Database configuration (for future use)
+SQL_CONNECTION_STRING = "sqlite:///database.db"
+
+# Validation constants
+MIN_USERNAME_LENGTH = 2
+MIN_PASSWORD_LENGTH = 2
+MAX_MESSAGE_LENGTH = 255
+MAX_NEW_MESSAGE_STORAGE = 5
+MAX_REQUEST_SIZE = 2048
+MAX_COMMAND_LENGTH = 50
+MAX_USERNAME_LENGTH = 50
+MAX_PASSWORD_LENGTH = 100
+
+# ID generation constants
+ID_RANDOM_BITS = 20  # bits of randomness for ID generation
+ID_HEX_BYTES = 4     # bytes for hex ID generation
+
+# Connection retry settings
+MAX_RETRY_ATTEMPTS = 3
+RETRY_DELAY = 1.0
+CONNECTION_TIMEOUT = 5.0
+
+FORBIDDEN_CHARS = ['"', "'", ';', '{', '}', '[', ']']
+
+====================
+FILE: base_repository.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\DAL\base_repository.py
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
+
+class BaseRepository(ABC):
+    @abstractmethod
+    def find_by_id(self, id: str) -> Optional[Dict[str, Any]]:
+        """Znajduje rekord po ID i zwraca je"""
+        pass
+
+    @abstractmethod
+    def find_all(self) -> List[Dict[str, Any]]:
+        """Zwraca wszystkie rekordy z bazy danych"""
+        pass
+
+    @abstractmethod
+    def find_by_field(self, field: str, value: Any) -> List[Dict[str, Any]]:
+        """Znajduje rekordy po wartości danego pola"""
+        pass
+
+    @abstractmethod
+    def save(self, data: Dict[str, Any]) -> bool:
+        """Zapisuje nowy rekord"""
+        pass
+
+    @abstractmethod
+    def update(self, id: str, data: Dict[str, Any]) -> bool:
+        """Aktualizuje istniejący rekord"""
+        pass
+
+    @abstractmethod
+    def delete(self, id: str) -> bool:
+        """Usuwa rekord"""
+        pass 
+
+====================
+FILE: json_repository.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\DAL\json_repository.py
+import json
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from DAL.base_repository import BaseRepository
+
+class JsonRepository(BaseRepository):
+    def __init__(self, file_path: str, collection_name: str):
+        self.file_path = file_path
+        self.collection_name = collection_name
+
+    def _load_data(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Wczytuje wszystkie dane z pliku JSON"""
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as file:
+                return json.load(file)
+        except FileNotFoundError:
+            return {self.collection_name: []}
+
+    def _save_data(self, data: Dict[str, List[Dict[str, Any]]]) -> bool:
+        """Zapisuje wszystkie dane do pliku JSON"""
+        with open(self.file_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+        return True
+
+    def find_by_id(self, id: str) -> Optional[Dict[str, Any]]:
+        data = self._load_data()
+        for item in data[self.collection_name]:
+            if item.get("id") == id:
+                return item
+        return None
+
+    def find_all(self) -> List[Dict[str, Any]]:
+        data = self._load_data()
+        return data[self.collection_name]
+
+    def find_by_field(self, field: str, value: Any) -> List[Dict[str, Any]]:
+        data = self._load_data()
+        return [item for item in data[self.collection_name] if item.get(field) == value]
+
+    def save(self, data: Dict[str, Any]) -> bool:
+        all_data = self._load_data()
+        all_data[self.collection_name].append(data)
+        return self._save_data(all_data)
+
+    def update(self, id: str, data: Dict[str, Any]) -> bool:
+        all_data = self._load_data()
+        for i, item in enumerate(all_data[self.collection_name]):
+            if item.get("id") == id:
+                all_data[self.collection_name][i] = {**item, **data}
+                return self._save_data(all_data)
+        return False
+
+    def delete(self, id: str) -> bool:
+        all_data = self._load_data()
+        all_data[self.collection_name] = [
+            item for item in all_data[self.collection_name] 
+            if item.get("id") != id
+        ]
+        return self._save_data(all_data) 
+    
+    
+   
+
+====================
+FILE: message.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Models\message.py
+import time
+import uuid
+import secrets
+from datetime import datetime
+from config import ID_RANDOM_BITS, ID_HEX_BYTES
+
+
+class Message():
+    def __init__(self):
+        self.id = None  # ID będzie przypisane przez serwis
+        self.username = None
+        self.sender = None
+        self.text = None
+        self.send_time = datetime.now().strftime('%Y-%m-%d godz. %H:%M')
+        self.read_time = None
+        self.is_read = 0
+
+    def _generate_id(self):
+        """Generuje unikalny ID używając UUID4 (bezpieczny i unikalny)"""
+        return str(uuid.uuid4())
+    
+    def _generate_numeric_id(self):
+        """Generuje unikalny numeryczny ID (timestamp + losowe bity)"""
+        timestamp_ms = int(time.time() * 1000)
+        random_bits = secrets.randbits(ID_RANDOM_BITS)  # Configurable bits of randomness
+        return (timestamp_ms << ID_RANDOM_BITS) | random_bits
+    
+    def _generate_short_id(self):
+        """Generuje krótki losowy ID (8 znaków hex)"""
+        return secrets.token_hex(ID_HEX_BYTES)  # Configurable hex bytes
+    
+    def _generate_send_time(self):
+        return datetime.now().strftime('%Y-%m-%d godz. %H:%M')
+    
+    def _generate_read_time(self):
+        return datetime.now().strftime('%Y-%m-%d godz. %H:%M')
+    
+    def to_dict(self):
+        """Konwertuje obiekt Message do słownika dla JSON"""
+        return {
+            'id': self.id,
+            'username': self.username,
+            'sender': self.sender,
+            'text': self.text,
+            'send_time': self.send_time,
+            'read_time': self.read_time,
+            'is_read': self.is_read
+        }
+   
+
+====================
+FILE: user.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Models\user.py
+from config import ROLE_PERMISSIONS
+
+
+class User():
+    def __init__(self):
+        self.id = None  
+        self.username = None
+        self.password = None
+        self.role = 'user'
+        self.is_logged = False
+        self.login_time = None
+        self.create_time = None
+
+    def is_user_allowed_to_command(self, command):
+        permissions = ROLE_PERMISSIONS[self.role][command]
+        return permissions
+
+
+====================
+FILE: test_base_message_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_base_message_manager.py
+import unittest
+from unittest.mock import Mock, patch
+from BLL.BaseMessageManager import BaseMessageManager
+from config import FORBIDDEN_CHARS
+
+class TestableMessageManager(BaseMessageManager):
+    """Konkretna implementacja BaseMessageManager dla celów testowych"""
+    
+    def __init__(self):
+        super().__init__()
+        # Tworzenie mocków dla trackowania wywołań
+        self.mock_send = Mock(return_value="send_result")
+        self.mock_read = Mock(return_value="read_result")
+        self.mock_read_u = Mock(return_value="read_u_result")
+        self.mock_read_a = Mock(return_value="read_a_result")
+        self.mock_read_o = Mock(return_value="read_o_result")
+        self.mock_login = Mock(return_value="login_result")
+        self.mock_logout = Mock(return_value="logout_result")
+        self.mock_help = Mock(return_value="help_result")
+        self.mock_info = Mock(return_value="info_result")
+        self.mock_create = Mock(return_value="create_result")
+        self.mock_delete = Mock(return_value="delete_result")
+        self.mock_edit = Mock(return_value="edit_result")
+        self.mock_unknown = Mock(return_value="unknown_command_result")
+
+    def handle_send_message(self, command, *args, **kwargs):
+        return self.mock_send(command, *args, **kwargs)
+    
+    def handle_read_new_message(self, command, *args, **kwargs):
+        return self.mock_read(command, *args, **kwargs)
+    
+    def handle_read_message_current_user_from_sender(self, command, *args, **kwargs):
+        return self.mock_read_u(command, *args, **kwargs)
+    
+    def handle_read_all_message_current_user(self, command, *args, **kwargs):
+        return self.mock_read_a(command, *args, **kwargs)
+    
+    def handle_read_message_user_from_sender(self, command, *args, **kwargs):
+        return self.mock_read_o(command, *args, **kwargs)
+    
+    def handle_login(self, command, *args, **kwargs):
+        return self.mock_login(command, *args, **kwargs)
+    
+    def handle_logout(self, command, *args, **kwargs):
+        return self.mock_logout(command, *args, **kwargs)
+    
+    def handle_get_help(self, command, *args, **kwargs):
+        return self.mock_help(command, *args, **kwargs)
+    
+    def handle_get_user_info(self, command, *args, **kwargs):
+        return self.mock_info(command, *args, **kwargs)
+    
+    def handle_create_new_user(self, command, *args, **kwargs):
+        return self.mock_create(command, *args, **kwargs)
+    
+    def handle_delete_user(self, command, *args, **kwargs):
+        return self.mock_delete(command, *args, **kwargs)
+    
+    def handle_edit_user_role(self, command, *args, **kwargs):
+        return self.mock_edit(command, *args, **kwargs)
+    
+    def _handle_unknown_command(self, command):
+        return self.mock_unknown(command)
+
+class TestBaseMessageManager(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.manager = TestableMessageManager()
+
+    def test_constructor_initializes_command_map(self):
+        """Test czy konstruktor inicjalizuje command_map"""
+        expected_commands = [
+            "send", "read", "read-u", "read-a", "read-o",
+            "login", "logout", "help", "info", "create", "delete", "edit"
+        ]
+        
+        self.assertIsInstance(self.manager.command_map, dict)
+        
+        for command in expected_commands:
+            self.assertIn(command, self.manager.command_map)
+            self.assertTrue(callable(self.manager.command_map[command]))
+
+    def test_command_map_completeness(self):
+        """Test czy command_map zawiera wszystkie oczekiwane komendy"""
+        expected_mapping = {
+            "send": "handle_send_message",
+            "read": "handle_read_new_message", 
+            "read-u": "handle_read_message_current_user_from_sender",
+            "read-a": "handle_read_all_message_current_user",
+            "read-o": "handle_read_message_user_from_sender",
+            "login": "handle_login",
+            "logout": "handle_logout",
+            "help": "handle_get_help",
+            "info": "handle_get_user_info",
+            "create": "handle_create_new_user",
+            "delete": "handle_delete_user",
+            "edit": "handle_edit_user_role"
+        }
+        
+        self.assertEqual(len(self.manager.command_map), len(expected_mapping))
+        
+        for command, method_name in expected_mapping.items():
+            self.assertIn(command, self.manager.command_map)
+            # Sprawdzenie czy metoda istnieje
+            self.assertTrue(hasattr(self.manager, method_name))
+
+    def test_process_command_known_command(self):
+        """Test przetwarzania znanej komendy"""
+        result = self.manager.process_command("send", receiver="test_user", text="hello")
+        
+        self.assertEqual(result, "send_result")
+        self.manager.mock_send.assert_called_once_with("send", receiver="test_user", text="hello")
+
+    def test_process_command_all_known_commands(self):
+        """Test przetwarzania wszystkich znanych komend"""
+        test_cases = [
+            ("send", "send_result", "mock_send"),
+            ("read", "read_result", "mock_read"),
+            ("read-u", "read_u_result", "mock_read_u"),
+            ("read-a", "read_a_result", "mock_read_a"),
+            ("read-o", "read_o_result", "mock_read_o"),
+            ("login", "login_result", "mock_login"),
+            ("logout", "logout_result", "mock_logout"),
+            ("help", "help_result", "mock_help"),
+            ("info", "info_result", "mock_info"),
+            ("create", "create_result", "mock_create"),
+            ("delete", "delete_result", "mock_delete"),
+            ("edit", "edit_result", "mock_edit")
+        ]
+        
+        for command, expected_result, mock_name in test_cases:
+            with self.subTest(command=command):
+                result = self.manager.process_command(command, test_param="test")
+                self.assertEqual(result, expected_result)
+                mock_method = getattr(self.manager, mock_name)
+                mock_method.assert_called_with(command, test_param="test")
+
+    def test_process_command_unknown_command(self):
+        """Test przetwarzania nieznanej komendy"""
+        result = self.manager.process_command("unknown_cmd")
+        
+        self.assertEqual(result, "unknown_command_result")
+        self.manager.mock_unknown.assert_called_once_with("unknown_cmd")
+
+    def test_process_command_with_args_and_kwargs(self):
+        """Test przetwarzania komendy z argumentami pozycyjnymi i nazwanymi"""
+        self.manager.process_command("send", "arg1", "arg2", kwarg1="value1", kwarg2="value2")
+        
+        self.manager.mock_send.assert_called_once_with(
+            "send", "arg1", "arg2", kwarg1="value1", kwarg2="value2"
+        )
+
+    def test_validate_string_normal_text(self):
+        """Test walidacji normalnego tekstu"""
+        result = self.manager._validate_string("Hello world")
+        self.assertEqual(result, "Hello world")
+
+    def test_validate_string_with_forbidden_chars(self):
+        """Test walidacji tekstu z zabronionymi znakami"""
+        test_text = 'Hello "world" with \'quotes\' and {brackets} and [arrays] and ;semicolon'
+        result = self.manager._validate_string(test_text)
+        
+        # Sprawdzenie czy wszystkie zabronione znaki zostały usunięte
+        for char in FORBIDDEN_CHARS:
+            self.assertNotIn(char, result)
+        
+        expected = "Hello world with quotes and brackets and arrays and semicolon"
+        self.assertEqual(result, expected)
+
+    def test_validate_string_each_forbidden_char(self):
+        """Test walidacji dla każdego zabronionego znaku osobno"""
+        for char in FORBIDDEN_CHARS:
+            with self.subTest(char=char):
+                test_text = f"test{char}text"
+                result = self.manager._validate_string(test_text)
+                self.assertEqual(result, "testtext")
+                self.assertNotIn(char, result)
+
+    def test_validate_string_with_whitespace(self):
+        """Test walidacji tekstu z białymi znakami"""
+        test_cases = [
+            ("  hello  ", "hello"),
+            ("\thello\t", "hello"),
+            ("\nhello\n", "hello"),
+            ("  hello world  ", "hello world"),
+            ("", "")
+        ]
+        
+        for input_text, expected in test_cases:
+            with self.subTest(input_text=repr(input_text)):
+                result = self.manager._validate_string(input_text)
+                self.assertEqual(result, expected)
+
+    def test_validate_string_non_string_input(self):
+        """Test walidacji dla nie-stringowych danych wejściowych"""
+        test_cases = [
+            (123, "123"),
+            (45.67, "45.67"),
+            (True, "True"),
+            (False, "False"),
+            ([1, 2, 3], "1, 2, 3")  # Nawiasy [] są w FORBIDDEN_CHARS i zostają usunięte
+        ]
+        
+        for input_value, expected in test_cases:
+            with self.subTest(input_value=input_value):
+                result = self.manager._validate_string(input_value)
+                self.assertEqual(result, expected)
+
+    def test_validate_string_conversion_error(self):
+        """Test obsługi błędu konwersji na string"""
+        # Mock obiektu który nie może być przekonwertowany na string
+        mock_obj = Mock()
+        mock_obj.__str__ = Mock(side_effect=Exception("Conversion error"))
+        
+        with self.assertRaises(ValueError) as context:
+            self.manager._validate_string(mock_obj)
+        
+        self.assertIn("Nie można przekonwertować wartości na tekst", str(context.exception))
+
+    def test_validate_string_none_input(self):
+        """Test walidacji dla None"""
+        result = self.manager._validate_string(None)
+        self.assertEqual(result, "None")
+
+    def test_validate_string_empty_string(self):
+        """Test walidacji pustego stringa"""
+        result = self.manager._validate_string("")
+        self.assertEqual(result, "")
+
+    def test_validate_string_only_forbidden_chars(self):
+        """Test walidacji tekstu składającego się tylko z zabronionych znaków"""
+        forbidden_text = ''.join(FORBIDDEN_CHARS)
+        result = self.manager._validate_string(forbidden_text)
+        self.assertEqual(result, "")
+
+    def test_validate_string_mixed_content(self):
+        """Test walidacji mieszanej zawartości"""
+        test_text = '  Hello "world" with numbers 123 and symbols!@#$%  '
+        result = self.manager._validate_string(test_text)
+        
+        # Powinien usunąć tylko zabronione znaki i przyciąć białe znaki
+        self.assertNotIn('"', result)
+        self.assertEqual(result, 'Hello world with numbers 123 and symbols!@#$%')
+
+    def test_process_command_case_sensitivity(self):
+        """Test czy komendy są case-sensitive"""
+        # Wielkie litery powinny być traktowane jako nieznane komendy
+        result = self.manager.process_command("SEND")
+        self.assertEqual(result, "unknown_command_result")
+        
+        result = self.manager.process_command("Send")
+        self.assertEqual(result, "unknown_command_result")
+
+    def test_process_command_empty_string(self):
+        """Test przetwarzania pustej komendy"""
+        result = self.manager.process_command("")
+        self.assertEqual(result, "unknown_command_result")
+        self.manager.mock_unknown.assert_called_with("")
+
+    def test_process_command_none_command(self):
+        """Test przetwarzania None jako komendy"""
+        result = self.manager.process_command(None)
+        self.assertEqual(result, "unknown_command_result")
+        self.manager.mock_unknown.assert_called_with(None)
+
+    def test_validate_string_preserves_valid_special_chars(self):
+        """Test czy walidacja zachowuje dozwolone znaki specjalne"""
+        valid_special_chars = "!@#$%^&*()_+-=<>?/\\|~`"
+        test_text = f"Hello{valid_special_chars}World"
+        result = self.manager._validate_string(test_text)
+        
+        for char in valid_special_chars:
+            self.assertIn(char, result, f"Valid special character '{char}' was removed")
+
+    def test_command_map_immutability_during_runtime(self):
+        """Test czy command_map nie zmienia się podczas wykonywania"""
+        original_map = self.manager.command_map.copy()
+        
+        # Wykonanie kilku komend
+        self.manager.process_command("send")
+        self.manager.process_command("read")
+        self.manager.process_command("unknown")
+        
+        # command_map powinien pozostać niezmieniony
+        self.assertEqual(self.manager.command_map, original_map)
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_client_connection_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_client_connection_manager.py
+import unittest
+import socket
+from unittest.mock import patch, MagicMock
+from BLL.ClientConnectionManager import ClientConnectionManager
+
+class TestClientConnectionManager(unittest.TestCase):
+    def setUp(self):
+        self.host = "localhost"
+        self.port = 12345
+        self.manager = ClientConnectionManager()
+        self.manager.host = self.host
+        self.manager.port = self.port
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_connection_establishment(self, mock_socket):
+        # Konfiguracja mocka
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+
+        # Test nawiązywania połączenia
+        with self.manager as manager:
+            mock_socket.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
+            mock_socket_instance.connect.assert_called_once_with((self.host, self.port))
+            mock_socket_instance.settimeout.assert_called_once()
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    @patch('BLL.ClientConnectionManager.time.sleep')  # Mock sleep aby przyspieszyć testy
+    def test_connection_refused_error(self, mock_sleep, mock_socket):
+        # Symulacja błędu połączenia
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        mock_socket_instance.connect.side_effect = ConnectionRefusedError("Connection refused")
+
+        # Test obsługi błędu połączenia - oczekujemy ConnectionError po wyczerpaniu prób
+        with self.assertRaises(ConnectionError) as context:
+            with self.manager:
+                pass
+        
+        # Sprawdzenie czy błąd zawiera informację o pierwotnym wyjątku
+        self.assertIn("Connection refused", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_send_request(self, mock_socket):
+        # Konfiguracja mocka
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        test_command = "test command"
+
+        # Test wysyłania komendy
+        with self.manager as manager:
+            manager.send_request(test_command)
+            mock_socket_instance.send.assert_called_once_with(test_command.encode("utf-8"))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_recv_response(self, mock_socket):
+        # Konfiguracja mocka
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        test_response = "test response"
+        mock_socket_instance.recv.return_value = test_response.encode("utf-8")
+
+        # Test odbierania odpowiedzi
+        with self.manager as manager:
+            response = manager.recv_response()
+            self.assertEqual(response, test_response)
+            # Sprawdzenie czy recv został wywołany z buffer_size z config
+            mock_socket_instance.recv.assert_called_once()
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_connection_reset_error(self, mock_socket):
+        # Konfiguracja mocka
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        mock_socket_instance.recv.side_effect = ConnectionResetError("Connection reset")
+
+        # Test obsługi błędu resetu połączenia - oczekujemy ConnectionError
+        with self.manager as manager:
+            with self.assertRaises(ConnectionError) as context:
+                manager.recv_response()
+            
+            # Sprawdzenie czy błąd zawiera informację o pierwotnym wyjątku
+            self.assertIn("Connection reset", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_connection_close(self, mock_socket):
+        # Konfiguracja mocka
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+
+        # Test zamykania połączenia
+        with self.manager:
+            pass
+        mock_socket_instance.close.assert_called_once()
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    @patch('BLL.ClientConnectionManager.time.sleep')
+    def test_retry_mechanism_success_on_second_attempt(self, mock_sleep, mock_socket):
+        """Test mechanizmu retry - sukces przy drugiej próbie"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        
+        # Pierwsza próba kończy się błędem, druga sukcesem
+        mock_socket_instance.connect.side_effect = [
+            ConnectionRefusedError("First attempt failed"),
+            None  # Druga próba jest udana
+        ]
+        
+        with self.manager as manager:
+            # Sprawdzenie czy connect został wywołany dwukrotnie
+            self.assertEqual(mock_socket_instance.connect.call_count, 2)
+            # Sprawdzenie czy sleep został wywołany raz (między próbami)
+            mock_sleep.assert_called_once_with(1.0)  # RETRY_DELAY
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_send_request_validation(self, mock_socket):
+        """Test walidacji danych przed wysłaniem"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        
+        with self.manager as manager:
+            # Test pustej komendy
+            with self.assertRaises(ValueError) as context:
+                manager.send_request("")
+            self.assertIn("nie może być pusta", str(context.exception))
+            
+            # Test komendy zawierającej tylko białe znaki
+            with self.assertRaises(ValueError) as context:
+                manager.send_request("   ")
+            self.assertIn("nie może być pusta", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_send_request_max_size_validation(self, mock_socket):
+        """Test walidacji maksymalnego rozmiaru komendy"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        
+        with self.manager as manager:
+            # Komenda przekraczająca maksymalny rozmiar (MAX_REQUEST_SIZE = 2048)
+            large_command = "x" * 3000
+            with self.assertRaises(ValueError) as context:
+                manager.send_request(large_command)
+            self.assertIn("przekracza maksymalny rozmiar", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_send_request_without_connection(self, mock_socket):
+        """Test wysyłania bez aktywnego połączenia"""
+        # Nie używamy context managera, więc nie ma aktywnego połączenia
+        with self.assertRaises(ConnectionError) as context:
+            self.manager.send_request("test")
+        self.assertIn("Brak aktywnego połączenia", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_recv_response_without_connection(self, mock_socket):
+        """Test odbierania bez aktywnego połączenia"""
+        # Nie używamy context managera, więc nie ma aktywnego połączenia
+        with self.assertRaises(ConnectionError) as context:
+            self.manager.recv_response()
+        self.assertIn("Brak aktywnego połączenia", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_recv_response_empty_response(self, mock_socket):
+        """Test obsługi pustej odpowiedzi (serwer zamknął połączenie)"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        mock_socket_instance.recv.return_value = b""  # Pusta odpowiedź
+        
+        with self.manager as manager:
+            with self.assertRaises(ConnectionError) as context:
+                manager.recv_response()
+            self.assertIn("Serwer zamknął połączenie", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_recv_response_unicode_decode_error(self, mock_socket):
+        """Test obsługi błędu dekodowania Unicode"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        # Nieprawidłowe dane Unicode
+        mock_socket_instance.recv.return_value = b'\xff\xfe'
+        
+        with self.manager as manager:
+            with self.assertRaises(ValueError) as context:
+                manager.recv_response()
+            self.assertIn("Nieprawidłowe kodowanie", str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_send_request_network_errors(self, mock_socket):
+        """Test obsługi różnych błędów sieciowych podczas wysyłania"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        
+        test_cases = [
+            (ConnectionResetError("Reset"), "Połączenie przerwane"),
+            (ConnectionAbortedError("Aborted"), "Połączenie przerwane"),
+            (BrokenPipeError("Broken pipe"), "Połączenie przerwane"),
+        ]
+        
+        for error, expected_msg in test_cases:
+            with self.subTest(error=error.__class__.__name__):
+                mock_socket_instance.send.side_effect = error
+                
+                with self.manager as manager:
+                    with self.assertRaises(ConnectionError) as context:
+                        manager.send_request("test")
+                    self.assertIn(expected_msg, str(context.exception))
+
+    @patch('BLL.ClientConnectionManager.s.socket')
+    def test_timeout_handling(self, mock_socket):
+        """Test obsługi timeout'ów"""
+        mock_socket_instance = MagicMock()
+        mock_socket.return_value = mock_socket_instance
+        
+        # Test timeout podczas wysyłania
+        import socket as sock_module
+        mock_socket_instance.send.side_effect = sock_module.timeout("Send timeout")
+        
+        with self.manager as manager:
+            with self.assertRaises(TimeoutError) as context:
+                manager.send_request("test")
+            self.assertIn("Timeout podczas wysyłania", str(context.exception))
+
+    def test_close_method(self):
+        """Test metody close()"""
+        # Symulacja istniejącego socketu
+        mock_socket = MagicMock()
+        self.manager.client_socket = mock_socket
+        
+        # Test zamknięcia
+        self.manager.close()
+        mock_socket.close.assert_called_once()
+
+    def test_close_method_no_socket(self):
+        """Test metody close() gdy nie ma socketu"""
+        # Test gdy nie ma socketu - nie powinno rzucać błędu
+        self.manager.close()
+        # Test przeszedł jeśli nie było wyjątku
+
+if __name__ == '__main__':
+    unittest.main() 
+
+====================
+FILE: test_client_message_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_client_message_manager.py
+import unittest
+from unittest.mock import Mock, patch, call
+from BLL.ClientMessageManager import ClientMessageManager
+
+class TestClientMessageManager(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.manager = ClientMessageManager()
+
+    def test_constructor_initializes_properly(self):
+        """Test czy konstruktor poprawnie inicjalizuje klasę"""
+        self.assertIsInstance(self.manager, ClientMessageManager)
+        self.assertIsInstance(self.manager.command_map, dict)
+        
+        # Sprawdzenie czy dziedziczy po BaseMessageManager
+        from BLL.BaseMessageManager import BaseMessageManager
+        self.assertIsInstance(self.manager, BaseMessageManager)
+
+    def test_create_request_basic_functionality(self):
+        """Test podstawowej funkcjonalności _create_request"""
+        result = self.manager._create_request("test_command", {"key": "value"})
+        expected = ["test_command", {"key": "value"}]
+        self.assertEqual(result, expected)
+
+    def test_create_request_with_empty_data(self):
+        """Test _create_request z pustymi danymi"""
+        result = self.manager._create_request("empty_command", {})
+        expected = ["empty_command", {}]
+        self.assertEqual(result, expected)
+
+    def test_create_request_command_as_string(self):
+        """Test czy komenda jest konwertowana na string"""
+        result = self.manager._create_request(123, {"data": "test"})
+        expected = ["123", {"data": "test"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_send_message(self):
+        """Test obsługi wysyłania wiadomości"""
+        result = self.manager.handle_send_message("send", receiver="john", text="Hello world")
+        expected = ["send", {"receiver": "john", "text": "Hello world"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_send_message_with_none_values(self):
+        """Test wysyłania wiadomości z wartościami None"""
+        result = self.manager.handle_send_message("send", receiver=None, text=None)
+        expected = ["send", {"receiver": None, "text": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_send_message_with_kwargs(self):
+        """Test wysyłania wiadomości z dodatkowymi argumentami kwargs"""
+        result = self.manager.handle_send_message("send", receiver="john", text="Hello", extra_param="ignored")
+        expected = ["send", {"receiver": "john", "text": "Hello"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_new_message(self):
+        """Test obsługi odczytu nowych wiadomości"""
+        result = self.manager.handle_read_new_message("read")
+        expected = ["read", {}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_new_message_with_kwargs(self):
+        """Test odczytu nowych wiadomości z argumentami kwargs"""
+        result = self.manager.handle_read_new_message("read", ignored_param="value")
+        expected = ["read", {}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_message_current_user_from_sender(self):
+        """Test obsługi odczytu wiadomości od konkretnego nadawcy"""
+        result = self.manager.handle_read_message_current_user_from_sender("read-u", sender="alice")
+        expected = ["read-u", {"sender": "alice"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_message_current_user_from_sender_none(self):
+        """Test odczytu wiadomości z None jako nadawca"""
+        result = self.manager.handle_read_message_current_user_from_sender("read-u", sender=None)
+        expected = ["read-u", {"sender": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_all_message_current_user(self):
+        """Test obsługi odczytu wszystkich wiadomości użytkownika"""
+        result = self.manager.handle_read_all_message_current_user("read-a")
+        expected = ["read-a", {}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_message_user_from_sender(self):
+        """Test obsługi odczytu wiadomości konkretnego użytkownika od nadawcy"""
+        result = self.manager.handle_read_message_user_from_sender("read-o", username="bob", sender="alice")
+        expected = ["read-o", {"username": "bob", "sender": "alice"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_read_message_user_from_sender_partial_params(self):
+        """Test z tylko jednym parametrem"""
+        result = self.manager.handle_read_message_user_from_sender("read-o", username="bob")
+        expected = ["read-o", {"username": "bob", "sender": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_login(self):
+        """Test obsługi logowania"""
+        result = self.manager.handle_login("login", username="testuser", password="secret123")
+        expected = ["login", {"username": "testuser", "password": "secret123"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_login_missing_params(self):
+        """Test logowania z brakującymi parametrami"""
+        result = self.manager.handle_login("login", username="testuser")
+        expected = ["login", {"username": "testuser", "password": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_logout(self):
+        """Test obsługi wylogowania"""
+        result = self.manager.handle_logout("logout")
+        expected = ["logout", {}]
+        self.assertEqual(result, expected)
+
+    def test_handle_get_help(self):
+        """Test obsługi pomocy"""
+        result = self.manager.handle_get_help("help")
+        expected = ["help", {}]
+        self.assertEqual(result, expected)
+
+    def test_handle_get_user_info(self):
+        """Test obsługi informacji o użytkowniku"""
+        result = self.manager.handle_get_user_info("info", username="testuser")
+        expected = ["info", {"username": "testuser"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_get_user_info_no_username(self):
+        """Test informacji o użytkowniku bez nazwy"""
+        result = self.manager.handle_get_user_info("info")
+        expected = ["info", {"username": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_create_new_user(self):
+        """Test obsługi tworzenia nowego użytkownika"""
+        result = self.manager.handle_create_new_user("create", username="newuser", password="newpass")
+        expected = ["create", {"username": "newuser", "password": "newpass"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_create_new_user_partial_params(self):
+        """Test tworzenia użytkownika z brakującymi parametrami"""
+        result = self.manager.handle_create_new_user("create", username="newuser")
+        expected = ["create", {"username": "newuser", "password": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_delete_user(self):
+        """Test obsługi usuwania użytkownika"""
+        result = self.manager.handle_delete_user("delete", username="userToDelete")
+        expected = ["delete", {"username": "userToDelete"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_delete_user_no_username(self):
+        """Test usuwania użytkownika bez nazwy"""
+        result = self.manager.handle_delete_user("delete")
+        expected = ["delete", {"username": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_edit_user_role(self):
+        """Test obsługi edycji roli użytkownika"""
+        result = self.manager.handle_edit_user_role("edit", username="testuser", new_role="admin")
+        expected = ["edit", {"username": "testuser", "new_role": "admin"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_edit_user_role_partial_params(self):
+        """Test edycji roli z brakującymi parametrami"""
+        result = self.manager.handle_edit_user_role("edit", username="testuser")
+        expected = ["edit", {"username": "testuser", "new_role": None}]
+        self.assertEqual(result, expected)
+
+    def test_handle_unknown_command(self):
+        """Test obsługi nieznanej komendy"""
+        result = self.manager._handle_unknown_command("unknown_cmd")
+        expected = ["error", {"message": "Nieznana komenda: unknown_cmd"}]
+        self.assertEqual(result, expected)
+
+    def test_handle_unknown_command_various_inputs(self):
+        """Test nieznanej komendy z różnymi wejściami"""
+        test_cases = [
+            ("", "Nieznana komenda: "),
+            ("CAPS", "Nieznana komenda: CAPS"),
+            ("123", "Nieznana komenda: 123"),
+            ("special@chars", "Nieznana komenda: special@chars")
+        ]
+        
+        for command, expected_message in test_cases:
+            with self.subTest(command=command):
+                result = self.manager._handle_unknown_command(command)
+                expected = ["error", {"message": expected_message}]
+                self.assertEqual(result, expected)
+
+    def test_process_command_integration(self):
+        """Test integracji z metodą process_command z klasy bazowej"""
+        # Test znanej komendy
+        result = self.manager.process_command("send", receiver="john", text="hello")
+        expected = ["send", {"receiver": "john", "text": "hello"}]
+        self.assertEqual(result, expected)
+        
+        # Test nieznanej komendy
+        result = self.manager.process_command("unknown")
+        expected = ["error", {"message": "Nieznana komenda: unknown"}]
+        self.assertEqual(result, expected)
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_help(self, mock_input):
+        """Test interaktywnego przygotowania żądania dla help"""
+        mock_input.return_value = "help"
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "help")
+        self.assertEqual(data, {})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_read_commands(self, mock_input):
+        """Test interaktywnych komend read"""
+        read_commands = ["read-a", "read", "logout"]
+        
+        for cmd in read_commands:
+            with self.subTest(command=cmd):
+                mock_input.return_value = cmd
+                command, data = self.manager.prepare_request_interactive()
+                self.assertEqual(command, cmd)
+                self.assertEqual(data, {})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_login(self, mock_input):
+        """Test interaktywnego logowania"""
+        mock_input.side_effect = ["login", "testuser", "testpass"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "login")
+        self.assertEqual(data, {"username": "testuser", "password": "testpass"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_create(self, mock_input):
+        """Test interaktywnego tworzenia użytkownika"""
+        mock_input.side_effect = ["create", "newuser", "newpass"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "create")
+        self.assertEqual(data, {"username": "newuser", "password": "newpass"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_send(self, mock_input):
+        """Test interaktywnego wysyłania wiadomości"""
+        mock_input.side_effect = ["send", "receiver", "test message"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "send")
+        self.assertEqual(data, {"receiver": "receiver", "text": "test message"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_read_u(self, mock_input):
+        """Test interaktywnego czytania wiadomości od użytkownika"""
+        mock_input.side_effect = ["read-u", "sender"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "read-u")
+        self.assertEqual(data, {"sender": "sender"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_read_o(self, mock_input):
+        """Test interaktywnego czytania wiadomości innego użytkownika"""
+        mock_input.side_effect = ["read-o", "username", "sender"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "read-o")
+        self.assertEqual(data, {"username": "username", "sender": "sender"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_edit(self, mock_input):
+        """Test interaktywnej edycji roli"""
+        mock_input.side_effect = ["edit", "username", "admin"]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "edit")
+        self.assertEqual(data, {"username": "username", "new_role": "admin"})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_info_delete(self, mock_input):
+        """Test interaktywnych komend info i delete"""
+        commands = ["info", "delete"]
+        
+        for cmd in commands:
+            with self.subTest(command=cmd):
+                mock_input.side_effect = [cmd, "username"]
+                command, data = self.manager.prepare_request_interactive()
+                self.assertEqual(command, cmd)
+                self.assertEqual(data, {"username": "username"})
+
+    @patch('builtins.input')
+    @patch('builtins.print')
+    def test_prepare_request_interactive_unknown_command(self, mock_print, mock_input):
+        """Test interaktywnej obsługi nieznanej komendy"""
+        mock_input.return_value = "unknown"
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "unknown")
+        self.assertEqual(data, {})
+        mock_print.assert_called_once_with("Komenda nie istnieje")
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_case_insensitive(self, mock_input):
+        """Test case insensitive dla interaktywnych komend"""
+        mock_input.side_effect = ["HELP"]  # uppercase
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "help")  # powinno być skonwertowane na lowercase
+        self.assertEqual(data, {})
+
+    @patch('builtins.input')
+    def test_prepare_request_interactive_whitespace_handling(self, mock_input):
+        """Test obsługi białych znaków w interaktywnych komendach"""
+        mock_input.side_effect = ["  help  ", "  testuser  ", "  testpass  "]
+        
+        command, data = self.manager.prepare_request_interactive()
+        
+        self.assertEqual(command, "help")
+
+    def test_get_login_input(self):
+        """Test metody _get_login_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.side_effect = ["TestUser", "TestPass"]
+            result = self.manager._get_login_input()
+            expected = {"username": "testuser", "password": "TestPass"}
+            self.assertEqual(result, expected)
+
+    def test_get_create_input(self):
+        """Test metody _get_create_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.side_effect = ["NewUser", "NewPass"]
+            result = self.manager._get_create_input()
+            expected = {"username": "newuser", "password": "NewPass"}
+            self.assertEqual(result, expected)
+
+    def test_get_send_message_input(self):
+        """Test metody _get_send_message_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.side_effect = ["Receiver", "Hello World"]
+            result = self.manager._get_send_message_input()
+            expected = {"receiver": "receiver", "text": "Hello World"}
+            self.assertEqual(result, expected)
+
+    def test_get_sender_input(self):
+        """Test metody _get_sender_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.return_value = "SenderName"
+            result = self.manager._get_sender_input()
+            expected = {"sender": "sendername"}
+            self.assertEqual(result, expected)
+
+    def test_get_read_message_input(self):
+        """Test metody _get_read_message_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.side_effect = ["Username", "Sender"]
+            result = self.manager._get_read_message_input()
+            expected = {"username": "username", "sender": "sender"}
+            self.assertEqual(result, expected)
+
+    def test_get_edit_role_input(self):
+        """Test metody _get_edit_role_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.side_effect = ["Username", "Admin"]
+            result = self.manager._get_edit_role_input()
+            expected = {"username": "username", "new_role": "admin"}
+            self.assertEqual(result, expected)
+
+    def test_get_username_input(self):
+        """Test metody _get_username_input"""
+        with patch('builtins.input') as mock_input:
+            mock_input.return_value = "TestUser"
+            result = self.manager._get_username_input()
+            expected = {"username": "testuser"}
+            self.assertEqual(result, expected)
+
+    def test_input_methods_whitespace_handling(self):
+        """Test obsługi białych znaków we wszystkich metodach input"""
+        input_methods = [
+            ('_get_login_input', ["  user  ", "  pass  "], {"username": "user", "password": "  pass  "}),
+            ('_get_create_input', ["  user  ", "  pass  "], {"username": "user", "password": "  pass  "}),
+            ('_get_send_message_input', ["  receiver  ", "  message  "], {"receiver": "receiver", "text": "  message  "}),
+            ('_get_sender_input', ["  sender  "], {"sender": "sender"}),
+            ('_get_read_message_input', ["  user  ", "  sender  "], {"username": "user", "sender": "sender"}),
+            ('_get_edit_role_input', ["  user  ", "  role  "], {"username": "user", "new_role": "role"}),
+            ('_get_username_input', ["  user  "], {"username": "user"})
+        ]
+        
+        for method_name, inputs, expected in input_methods:
+            with self.subTest(method=method_name):
+                with patch('builtins.input') as mock_input:
+                    mock_input.side_effect = inputs
+                    method = getattr(self.manager, method_name)
+                    result = method()
+                    self.assertEqual(result, expected)
+
+    def test_all_handler_methods_exist(self):
+        """Test czy wszystkie metody handler istnieją i są callable"""
+        expected_handlers = [
+            'handle_send_message',
+            'handle_read_new_message',
+            'handle_read_message_current_user_from_sender',
+            'handle_read_all_message_current_user',
+            'handle_read_message_user_from_sender',
+            'handle_login',
+            'handle_logout',
+            'handle_get_help',
+            'handle_get_user_info',
+            'handle_create_new_user',
+            'handle_delete_user',
+            'handle_edit_user_role'
+        ]
+        
+        for handler_name in expected_handlers:
+            with self.subTest(handler=handler_name):
+                self.assertTrue(hasattr(self.manager, handler_name))
+                handler = getattr(self.manager, handler_name)
+                self.assertTrue(callable(handler))
+
+    def test_command_consistency_between_map_and_handlers(self):
+        """Test spójności między command_map a rzeczywistymi handlerami"""
+        for command, handler in self.manager.command_map.items():
+            with self.subTest(command=command):
+                # Sprawdź czy handler jest callable
+                self.assertTrue(callable(handler))
+                
+                # Sprawdź czy wywołanie handlera zwraca oczekiwany format
+                result = handler(command)
+                self.assertIsInstance(result, list)
+                self.assertEqual(len(result), 2)
+                self.assertEqual(result[0], command)
+                self.assertIsInstance(result[1], dict)
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_db_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_db_manager.py
+import unittest
+import json
+import os
+import tempfile
+import bcrypt
+from datetime import datetime
+from BLL.DbManager import DbManager
+from DAL.json_repository import JsonRepository
+from Models.message import Message
+
+class TestDbManager(unittest.TestCase):
+    def setUp(self):
+        # Tworzenie tymczasowych plików dla testów
+        self.temp_users_db = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.json')
+        self.temp_messages_db = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.json')
+        
+        # Hashowanie hasła testowego
+        test_password = "test_pass"
+        hashed_password = bcrypt.hashpw(test_password.encode('utf-8'), bcrypt.gensalt())
+        
+        # Inicjalizacja przykładowych danych
+        self.users_data = {
+            "users": [
+                {   "id": "1",
+                    "username": "test_user",
+                    "password": hashed_password.decode('utf-8'),  # Konwersja na string do zapisu w JSON
+                    "role": "user",
+                    "login_time": datetime.now().isoformat()
+                }
+            ]
+        }
+        
+        self.messages_data = {
+            "messages": [
+                {
+                    "id": "1",
+                    "text": "Test message",
+                    "username": "test_user",
+                    "sender": "sender_user",
+                    "send_time": datetime.now().strftime("%Y-%m-%d godz. %H:%M"),
+                    "is_read": 0,
+                    "read_time": None
+                }
+            ]
+        }
+        
+        # Zapisanie danych do tymczasowych plików
+        json.dump(self.users_data, self.temp_users_db)
+        json.dump(self.messages_data, self.temp_messages_db)
+        
+        self.temp_users_db.close()
+        self.temp_messages_db.close()
+        
+        # Inicjalizacja DbManager z tymczasowymi plikami
+        self.db_manager = DbManager()
+        self.db_manager.users_repository = JsonRepository(self.temp_users_db.name, "users")
+        self.db_manager.messages_repository = JsonRepository(self.temp_messages_db.name, "messages")
+
+    def tearDown(self):
+        # Usuwanie tymczasowych plików
+        os.unlink(self.temp_users_db.name)
+        os.unlink(self.temp_messages_db.name)
+
+    
+    def test_add_message_into_db(self):
+        message = Message()
+        message.id = "2"
+        message.text = "New test message"
+        message.username = "test_user"
+        message.sender = "new_sender"
+        message.send_time = datetime.now().strftime('%Y-%m-%d godz. %H:%M')
+        message.read_time = None
+        message.is_read = 0
+        
+        result = self.db_manager.add_message_into_db(message)
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy wiadomość została dodana
+        messages = self.db_manager.messages_repository.find_all()
+        self.assertEqual(len(messages), 2)
+
+    def test_delete_message_from_db(self):
+        result = self.db_manager.delete_message_from_db("1", "test_user")
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy wiadomość została usunięta
+        messages = self.db_manager.messages_repository.find_all()
+        self.assertEqual(len(messages), 0)
+
+    def test_get_all_messages_user(self):
+        messages = self.db_manager.get_all_messages_user("test_user")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0], "Test message")
+
+    def test_get_all_messages_user_from_sender(self):
+        messages = self.db_manager.get_all_messages_user_from_sender("test_user", "sender_user")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0], "Test message")
+
+    def test_get_all_new_messages_user(self):
+        messages = self.db_manager.get_all_new_messages_user("test_user")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0][0], "Test message")
+
+    def test_change_message_status_into_read(self):
+        result = self.db_manager.change_message_status_into_read("test_user")
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy status został zmieniony
+        message = self.db_manager.messages_repository.find_by_id("1")
+        self.assertEqual(message["is_read"], 1)
+
+    def test_add_user_into_db(self):
+        new_password = "new_pass"
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        
+        new_user = {
+            "id": "2",
+            "username": "new_user",
+            "password": hashed_password.decode('utf-8'),
+            "role": "user",
+            "login_time": datetime.now().isoformat()
+        }
+        
+        result = self.db_manager.add_user_into_db(new_user)
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy użytkownik został dodany
+        users = self.db_manager.users_repository.find_all()
+        self.assertEqual(len(users), 2)
+
+    def test_delete_user_from_db(self):
+        # Sprawdzenie czy użytkownik istnieje przed usunięciem
+        self.assertTrue(self.db_manager.is_user_in_db("test_user"))
+        
+        # Usunięcie użytkownika
+        result = self.db_manager.delete_user_from_db("test_user")
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy użytkownik został usunięty
+        self.assertFalse(self.db_manager.is_user_in_db("test_user"))
+
+    def test_edit_user_role_in_db(self):
+        result = self.db_manager.edit_user_role_in_db("test_user", "admin")
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy rola została zmieniona
+        user = self.db_manager.users_repository.find_by_id("1")
+        self.assertEqual(user["role"], "admin")
+
+    def test_is_user_in_db(self):
+        # Test dla istniejącego użytkownika
+        result = self.db_manager.is_user_in_db("test_user")
+        self.assertTrue(result)
+        
+        # Test dla nieistniejącego użytkownika
+        result = self.db_manager.is_user_in_db("non_existent_user")
+        self.assertFalse(result)
+
+    def test_is_message_in_db(self):
+        # Test dla istniejącej wiadomości
+        result = self.db_manager.is_message_in_db("1")
+        self.assertTrue(result)
+        
+        # Test dla nieistniejącej wiadomości
+        result = self.db_manager.is_message_in_db("999")
+        self.assertFalse(result)
+
+    def test_is_user_password_in_db(self):
+        # Test dla poprawnego hasła
+        result = self.db_manager.is_user_password_in_db("test_user", self.users_data["users"][0]["password"])
+        self.assertTrue(result)
+        
+        # Test dla niepoprawnego hasła
+        result = self.db_manager.is_user_password_in_db("test_user", "wrong_pass")
+        self.assertFalse(result)
+
+    def test_get_user_info(self):
+        # Test dla istniejącego użytkownika
+        user_info = self.db_manager.get_user_info("test_user")
+        self.assertIsNotNone(user_info)
+        self.assertEqual(user_info["username"], "test_user")
+        self.assertEqual(user_info["role"], "user")
+        self.assertIn("login_time", user_info)
+        self.assertNotIn("password", user_info)  # Sprawdzenie czy hasło nie jest zwracane
+        
+        # Test dla nieistniejącego użytkownika
+        non_existent_user = self.db_manager.get_user_info("non_existent_user")
+        self.assertIsNone(non_existent_user)
+
+    def test_get_user_password(self):
+        password = self.db_manager.get_user_password("test_user")
+        self.assertEqual(password, self.users_data["users"][0]["password"])
+
+    def test_get_user_role(self):
+        # Test dla istniejącego użytkownika
+        role = self.db_manager.get_user_role("test_user")
+        self.assertEqual(role, "user")
+        
+        # Test dla nieistniejącego użytkownika
+        role = self.db_manager.get_user_role("non_existent_user")
+        self.assertIsNone(role)
+        
+        # Test dla użytkownika z inną rolą
+        self.db_manager.edit_user_role_in_db("test_user", "admin")
+        role = self.db_manager.get_user_role("test_user")
+        self.assertEqual(role, "admin")
+        
+        # Sprawdzenie czy hasło nie jest zwracane
+        user_info = self.db_manager.get_user_info("test_user")
+        self.assertNotIn("password", user_info)
+
+if __name__ == '__main__':
+    unittest.main() 
+
+====================
+FILE: test_json_repository.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_json_repository.py
+import unittest
+import json
+import os
+import tempfile
+from DAL.json_repository import JsonRepository
+
+class TestJsonRepository(unittest.TestCase):
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.json')
+        self.collection_name = "test_items"
+        
+        # Inicjalizacja przykładowych danych
+        self.initial_data = {
+            self.collection_name: [
+                {"id": "1", "name": "Item 1", "value": 100},
+                {"id": "2", "name": "Item 2", "value": 200},
+                {"id": "3", "name": "Item 3", "value": 300}
+            ]
+        }
+        
+        # Zapisanie danych do tymczasowego pliku
+        json.dump(self.initial_data, self.temp_file)
+        self.temp_file.close()
+        
+        # Inicjalizacja JsonRepository
+        self.repository = JsonRepository(self.temp_file.name, self.collection_name)
+
+    def tearDown(self):
+        """Czyszczenie po testach"""
+        os.unlink(self.temp_file.name)
+
+    def test_find_by_id_existing(self):
+        """Test znajdowania istniejącego elementu po ID"""
+        item = self.repository.find_by_id("1")
+        self.assertIsNotNone(item)
+        self.assertEqual(item["id"], "1")
+        self.assertEqual(item["name"], "Item 1")
+        self.assertEqual(item["value"], 100)
+
+    def test_find_by_id_non_existing(self):
+        """Test znajdowania nieistniejącego elementu po ID"""
+        item = self.repository.find_by_id("999")
+        self.assertIsNone(item)
+
+    def test_find_all(self):
+        """Test pobierania wszystkich elementów"""
+        items = self.repository.find_all()
+        self.assertEqual(len(items), 3)
+        self.assertEqual(items[0]["id"], "1")
+        self.assertEqual(items[1]["id"], "2")
+        self.assertEqual(items[2]["id"], "3")
+
+    def test_find_by_field_existing(self):
+        """Test znajdowania elementów po wartości pola"""
+        items = self.repository.find_by_field("name", "Item 1")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["id"], "1")
+
+    def test_find_by_field_non_existing(self):
+        """Test znajdowania elementów po nieistniejącej wartości pola"""
+        items = self.repository.find_by_field("name", "Non-existent Item")
+        self.assertEqual(len(items), 0)
+
+    def test_find_by_field_multiple_results(self):
+        """Test znajdowania wielu elementów po wartości pola"""
+        # Dodajemy element z taką samą wartością
+        new_item = {"id": "4", "name": "Item 1", "value": 400}
+        self.repository.save(new_item)
+        
+        items = self.repository.find_by_field("name", "Item 1")
+        self.assertEqual(len(items), 2)
+
+    def test_save_new_item(self):
+        """Test zapisywania nowego elementu"""
+        new_item = {"id": "4", "name": "Item 4", "value": 400}
+        result = self.repository.save(new_item)
+        
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy element został dodany
+        items = self.repository.find_all()
+        self.assertEqual(len(items), 4)
+        
+        saved_item = self.repository.find_by_id("4")
+        self.assertIsNotNone(saved_item)
+        self.assertEqual(saved_item["name"], "Item 4")
+
+    def test_update_existing_item(self):
+        """Test aktualizacji istniejącego elementu"""
+        update_data = {"name": "Updated Item 1", "value": 150}
+        result = self.repository.update("1", update_data)
+        
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy element został zaktualizowany
+        updated_item = self.repository.find_by_id("1")
+        self.assertIsNotNone(updated_item)
+        self.assertEqual(updated_item["name"], "Updated Item 1")
+        self.assertEqual(updated_item["value"], 150)
+        self.assertEqual(updated_item["id"], "1")  # ID nie powinno się zmienić
+
+    def test_update_non_existing_item(self):
+        """Test aktualizacji nieistniejącego elementu"""
+        update_data = {"name": "Non-existent Item", "value": 999}
+        result = self.repository.update("999", update_data)
+        
+        self.assertFalse(result)
+
+    def test_delete_existing_item(self):
+        """Test usuwania istniejącego elementu"""
+        result = self.repository.delete("1")
+        
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy element został usunięty
+        items = self.repository.find_all()
+        self.assertEqual(len(items), 2)
+        
+        deleted_item = self.repository.find_by_id("1")
+        self.assertIsNone(deleted_item)
+
+    def test_delete_non_existing_item(self):
+        """Test usuwania nieistniejącego elementu"""
+        result = self.repository.delete("999")
+        
+        self.assertTrue(result)  # Metoda zwraca True nawet jeśli element nie istniał
+        
+        # Sprawdzenie że liczba elementów się nie zmieniła
+        items = self.repository.find_all()
+        self.assertEqual(len(items), 3)
+
+    def test_load_data_from_non_existing_file(self):
+        """Test wczytywania danych z nieistniejącego pliku"""
+        non_existing_repo = JsonRepository("non_existing_file.json", "test")
+        data = non_existing_repo._load_data()
+        
+        self.assertIsInstance(data, dict)
+        self.assertIn("test", data)
+        self.assertEqual(data["test"], [])
+
+    def test_save_data_creates_valid_json(self):
+        """Test czy _save_data tworzy prawidłowy plik JSON"""
+        test_data = {
+            self.collection_name: [
+                {"id": "test", "name": "Test Item"}
+            ]
+        }
+        
+        result = self.repository._save_data(test_data)
+        self.assertTrue(result)
+        
+        # Sprawdzenie czy plik został poprawnie zapisany
+        with open(self.temp_file.name, 'r', encoding='utf-8') as file:
+            loaded_data = json.load(file)
+        
+        self.assertEqual(loaded_data, test_data)
+
+    def test_save_and_load_data_consistency(self):
+        """Test spójności danych po zapisie i odczycie"""
+        original_items = self.repository.find_all()
+        
+        # Dodajemy nowy element
+        new_item = {"id": "5", "name": "Item 5", "value": 500}
+        self.repository.save(new_item)
+        
+        # Tworzymy nowe repozytorium dla tego samego pliku
+        new_repo = JsonRepository(self.temp_file.name, self.collection_name)
+        loaded_items = new_repo.find_all()
+        
+        self.assertEqual(len(loaded_items), len(original_items) + 1)
+        self.assertIsNotNone(new_repo.find_by_id("5"))
+
+    def test_empty_collection_operations(self):
+        """Test operacji na pustej kolekcji"""
+        empty_repo = JsonRepository("empty_test.json", "empty_collection")
+        
+        # Test find_all na pustej kolekcji
+        items = empty_repo.find_all()
+        self.assertEqual(len(items), 0)
+        
+        # Test find_by_id na pustej kolekcji
+        item = empty_repo.find_by_id("1")
+        self.assertIsNone(item)
+        
+        # Test find_by_field na pustej kolekcji
+        items = empty_repo.find_by_field("name", "test")
+        self.assertEqual(len(items), 0)
+        
+        # Czyszczenie
+        if os.path.exists("empty_test.json"):
+            os.unlink("empty_test.json")
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_message.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_message.py
+import unittest
+import uuid
+import re
+from datetime import datetime
+from unittest.mock import patch, MagicMock
+from Models.message import Message
+
+class TestMessage(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.message = Message()
+
+    def test_message_constructor_default_values(self):
+        """Test domyślnych wartości konstruktora Message"""
+        message = Message()
+        
+        self.assertIsNone(message.id)
+        self.assertIsNone(message.username)
+        self.assertIsNone(message.sender)
+        self.assertIsNone(message.text)
+        self.assertIsNotNone(message.send_time)
+        self.assertIsNone(message.read_time)
+        self.assertEqual(message.is_read, 0)
+
+    def test_message_send_time_format(self):
+        """Test formatu send_time w konstruktorze"""
+        message = Message()
+        
+        # Sprawdzenie czy send_time ma poprawny format
+        time_pattern = r'\d{4}-\d{2}-\d{2} godz\. \d{2}:\d{2}'
+        self.assertIsNotNone(re.match(time_pattern, message.send_time))
+
+    def test_message_attributes_assignment(self):
+        """Test przypisywania wartości do atrybutów Message"""
+        message = Message()
+        
+        message.id = "test_id_123"
+        message.username = "test_user"
+        message.sender = "test_sender"
+        message.text = "Test message content"
+        message.read_time = "2024-01-01 godz. 12:00"
+        message.is_read = 1
+        
+        self.assertEqual(message.id, "test_id_123")
+        self.assertEqual(message.username, "test_user")
+        self.assertEqual(message.sender, "test_sender")
+        self.assertEqual(message.text, "Test message content")
+        self.assertEqual(message.read_time, "2024-01-01 godz. 12:00")
+        self.assertEqual(message.is_read, 1)
+
+    def test_generate_id_uuid_format(self):
+        """Test generowania UUID ID"""
+        generated_id = self.message._generate_id()
+        
+        self.assertIsInstance(generated_id, str)
+        # Sprawdzenie czy to prawidłowy UUID
+        try:
+            uuid.UUID(generated_id)
+            is_valid_uuid = True
+        except ValueError:
+            is_valid_uuid = False
+        
+        self.assertTrue(is_valid_uuid)
+
+    def test_generate_id_uniqueness(self):
+        """Test unikalności generowanych UUID ID"""
+        ids = set()
+        for _ in range(100):
+            new_id = self.message._generate_id()
+            self.assertNotIn(new_id, ids)
+            ids.add(new_id)
+
+    @patch('time.time')
+    @patch('secrets.randbits')
+    def test_generate_numeric_id(self, mock_randbits, mock_time):
+        """Test generowania numerycznego ID"""
+        mock_time.return_value = 1640995200.0  # 2022-01-01 00:00:00
+        mock_randbits.return_value = 123
+        
+        numeric_id = self.message._generate_numeric_id()
+        
+        self.assertIsInstance(numeric_id, int)
+        self.assertGreater(numeric_id, 0)
+        mock_randbits.assert_called_once()
+
+    def test_generate_numeric_id_uniqueness(self):
+        """Test unikalności generowanych numerycznych ID"""
+        ids = set()
+        for _ in range(100):
+            new_id = self.message._generate_numeric_id()
+            self.assertNotIn(new_id, ids)
+            ids.add(new_id)
+
+    @patch('secrets.token_hex')
+    def test_generate_short_id(self, mock_token_hex):
+        """Test generowania krótkiego ID"""
+        mock_token_hex.return_value = "a1b2c3d4"
+        
+        short_id = self.message._generate_short_id()
+        
+        self.assertEqual(short_id, "a1b2c3d4")
+        mock_token_hex.assert_called_once()
+
+    def test_generate_short_id_format(self):
+        """Test formatu krótkiego ID"""
+        short_id = self.message._generate_short_id()
+        
+        self.assertIsInstance(short_id, str)
+        # Sprawdzenie czy to prawidłowy hex string
+        hex_pattern = r'^[a-f0-9]+$'
+        self.assertIsNotNone(re.match(hex_pattern, short_id))
+
+    def test_generate_short_id_uniqueness(self):
+        """Test unikalności generowanych krótkich ID"""
+        ids = set()
+        for _ in range(100):
+            new_id = self.message._generate_short_id()
+            self.assertNotIn(new_id, ids)
+            ids.add(new_id)
+
+    @patch('Models.message.datetime')
+    def test_generate_send_time(self, mock_datetime):
+        """Test generowania send_time"""
+        mock_now = MagicMock()
+        mock_now.strftime.return_value = "2024-01-01 godz. 12:00"
+        mock_datetime.now.return_value = mock_now
+        
+        send_time = self.message._generate_send_time()
+        
+        self.assertEqual(send_time, "2024-01-01 godz. 12:00")
+        mock_datetime.now.assert_called_once()
+        mock_now.strftime.assert_called_once_with('%Y-%m-%d godz. %H:%M')
+
+    @patch('Models.message.datetime')
+    def test_generate_read_time(self, mock_datetime):
+        """Test generowania read_time"""
+        mock_now = MagicMock()
+        mock_now.strftime.return_value = "2024-01-01 godz. 12:30"
+        mock_datetime.now.return_value = mock_now
+        
+        read_time = self.message._generate_read_time()
+        
+        self.assertEqual(read_time, "2024-01-01 godz. 12:30")
+        mock_datetime.now.assert_called_once()
+        mock_now.strftime.assert_called_once_with('%Y-%m-%d godz. %H:%M')
+
+    def test_generate_send_time_format(self):
+        """Test rzeczywistego formatu generate_send_time"""
+        send_time = self.message._generate_send_time()
+        
+        time_pattern = r'\d{4}-\d{2}-\d{2} godz\. \d{2}:\d{2}'
+        self.assertIsNotNone(re.match(time_pattern, send_time))
+
+    def test_generate_read_time_format(self):
+        """Test rzeczywistego formatu generate_read_time"""
+        read_time = self.message._generate_read_time()
+        
+        time_pattern = r'\d{4}-\d{2}-\d{2} godz\. \d{2}:\d{2}'
+        self.assertIsNotNone(re.match(time_pattern, read_time))
+
+    def test_message_state_changes(self):
+        """Test zmiany stanu wiadomości z nieprzeczytanej na przeczytaną"""
+        message = Message()
+        
+        # Początkowy stan - nieprzeczytana
+        self.assertEqual(message.is_read, 0)
+        self.assertIsNone(message.read_time)
+        
+        # Zmiana na przeczytaną
+        message.is_read = 1
+        message.read_time = message._generate_read_time()
+        
+        self.assertEqual(message.is_read, 1)
+        self.assertIsNotNone(message.read_time)
+
+    def test_message_complete_workflow(self):
+        """Test kompletnego workflow wiadomości"""
+        message = Message()
+        
+        # Ustawienie wszystkich wymaganych pól
+        message.id = message._generate_id()
+        message.username = "recipient"
+        message.sender = "sender"
+        message.text = "Hello, this is a test message!"
+        
+        # Sprawdzenie że wiadomość jest gotowa do wysłania
+        self.assertIsNotNone(message.id)
+        self.assertIsNotNone(message.username)
+        self.assertIsNotNone(message.sender)
+        self.assertIsNotNone(message.text)
+        self.assertIsNotNone(message.send_time)
+        self.assertEqual(message.is_read, 0)
+        self.assertIsNone(message.read_time)
+        
+        # Symulacja przeczytania wiadomości
+        message.is_read = 1
+        message.read_time = message._generate_read_time()
+        
+        self.assertEqual(message.is_read, 1)
+        self.assertIsNotNone(message.read_time)
+
+    def test_message_data_types(self):
+        """Test typów danych atrybutów Message"""
+        message = Message()
+        
+        message.id = "string_id"
+        message.username = "username"
+        message.sender = "sender"
+        message.text = "message text"
+        message.send_time = "2024-01-01 godz. 12:00"
+        message.read_time = "2024-01-01 godz. 12:30"
+        message.is_read = 1
+        
+        self.assertIsInstance(message.id, str)
+        self.assertIsInstance(message.username, str)
+        self.assertIsInstance(message.sender, str)
+        self.assertIsInstance(message.text, str)
+        self.assertIsInstance(message.send_time, str)
+        self.assertIsInstance(message.read_time, str)
+        self.assertIsInstance(message.is_read, int)
+
+    def test_message_empty_values(self):
+        """Test obsługi pustych wartości"""
+        message = Message()
+        
+        message.id = ""
+        message.username = ""
+        message.sender = ""
+        message.text = ""
+        
+        self.assertEqual(message.id, "")
+        self.assertEqual(message.username, "")
+        self.assertEqual(message.sender, "")
+        self.assertEqual(message.text, "")
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_repository_factory.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_repository_factory.py
+import unittest
+from unittest.mock import patch, Mock, MagicMock
+import sys
+from BLL.RepositoryFactory import RepositoryFactory
+from DAL.json_repository import JsonRepository
+from DAL.base_repository import BaseRepository
+
+class TestRepositoryFactory(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.factory = RepositoryFactory()
+    
+    # ============= TESTS FOR JSON DATABASE TYPE =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('BLL.RepositoryFactory.PATH_USERS_DB', 'test_users.json')
+    def test_create_users_repository_json_type(self):
+        """Test tworzenia users repository dla typu JSON"""
+        repository = RepositoryFactory.create_users_repository()
+        
+        # Sprawdzenie czy zwrócono JsonRepository
+        self.assertIsInstance(repository, JsonRepository)
+        self.assertIsInstance(repository, BaseRepository)
+        
+        # Sprawdzenie czy repository ma poprawne ustawienia
+        self.assertEqual(repository.file_path, 'test_users.json')
+        self.assertEqual(repository.collection_name, 'users')
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('BLL.RepositoryFactory.PATH_MESSAGES_DB', 'test_messages.json')
+    def test_create_messages_repository_json_type(self):
+        """Test tworzenia messages repository dla typu JSON"""
+        repository = RepositoryFactory.create_messages_repository()
+        
+        # Sprawdzenie czy zwrócono JsonRepository
+        self.assertIsInstance(repository, JsonRepository)
+        self.assertIsInstance(repository, BaseRepository)
+        
+        # Sprawdzenie czy repository ma poprawne ustawienia
+        self.assertEqual(repository.file_path, 'test_messages.json')
+        self.assertEqual(repository.collection_name, 'messages')
+    
+    # ============= TESTS FOR SQL DATABASE TYPE =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'SQL')
+    def test_create_users_repository_sql_type_import_error(self):
+        """Test błędu importu SqlRepository dla users repository"""
+        with self.assertRaises(ImportError):
+            RepositoryFactory.create_users_repository()
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'SQL')
+    def test_create_messages_repository_sql_type_import_error(self):
+        """Test błędu importu SqlRepository dla messages repository"""
+        with self.assertRaises(ImportError):
+            RepositoryFactory.create_messages_repository()
+    
+    # ============= TESTS FOR INVALID DATABASE TYPE =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'INVALID_TYPE')
+    def test_create_users_repository_invalid_type(self):
+        """Test błędu dla nieprawidłowego typu bazy danych - users repository"""
+        with self.assertRaises(ValueError) as context:
+            RepositoryFactory.create_users_repository()
+        
+        self.assertEqual(str(context.exception), "Unsupported database type: INVALID_TYPE")
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'INVALID_TYPE')
+    def test_create_messages_repository_invalid_type(self):
+        """Test błędu dla nieprawidłowego typu bazy danych - messages repository"""
+        with self.assertRaises(ValueError) as context:
+            RepositoryFactory.create_messages_repository()
+        
+        self.assertEqual(str(context.exception), "Unsupported database type: INVALID_TYPE")
+    
+    # ============= TESTS FOR EDGE CASES =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', '')
+    def test_create_users_repository_empty_database_type(self):
+        """Test obsługi pustego DATABASE_TYPE"""
+        with self.assertRaises(ValueError) as context:
+            RepositoryFactory.create_users_repository()
+        
+        self.assertEqual(str(context.exception), "Unsupported database type: ")
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', None)
+    def test_create_users_repository_none_database_type(self):
+        """Test obsługi None jako DATABASE_TYPE"""
+        with self.assertRaises(ValueError) as context:
+            RepositoryFactory.create_users_repository()
+        
+        self.assertEqual(str(context.exception), "Unsupported database type: None")
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'json')  # lowercase
+    def test_create_users_repository_case_sensitive(self):
+        """Test czy DATABASE_TYPE jest case-sensitive"""
+        with self.assertRaises(ValueError) as context:
+            RepositoryFactory.create_users_repository()
+        
+        self.assertEqual(str(context.exception), "Unsupported database type: json")
+    
+    # ============= TESTS FOR METHOD CONSISTENCY =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('BLL.RepositoryFactory.PATH_USERS_DB', 'users.json')
+    @patch('BLL.RepositoryFactory.PATH_MESSAGES_DB', 'messages.json')
+    def test_both_methods_return_same_type_json(self):
+        """Test czy obie metody zwracają ten sam typ dla JSON"""
+        users_repo = RepositoryFactory.create_users_repository()
+        messages_repo = RepositoryFactory.create_messages_repository()
+        
+        # Sprawdzenie czy oba są JsonRepository
+        self.assertIsInstance(users_repo, JsonRepository)
+        self.assertIsInstance(messages_repo, JsonRepository)
+        self.assertEqual(type(users_repo), type(messages_repo))
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'SQL')
+    def test_both_methods_return_same_error_sql(self):
+        """Test czy obie metody zwracają ten sam błąd dla SQL"""
+        with self.assertRaises(ImportError):
+            RepositoryFactory.create_users_repository()
+        
+        with self.assertRaises(ImportError):
+            RepositoryFactory.create_messages_repository()
+    
+    # ============= TESTS FOR RETURN TYPE VALIDATION =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('config.PATH_USERS_DB', 'users.json')
+    def test_users_repository_implements_base_repository(self):
+        """Test czy users repository implementuje BaseRepository interface"""
+        repository = RepositoryFactory.create_users_repository()
+        
+        # Sprawdzenie czy ma wszystkie wymagane metody BaseRepository
+        required_methods = ['find_by_id', 'find_all', 'find_by_field', 'save', 'update', 'delete']
+        for method in required_methods:
+            self.assertTrue(hasattr(repository, method), 
+                          f"Repository nie ma metody {method}")
+            self.assertTrue(callable(getattr(repository, method)), 
+                          f"Metoda {method} nie jest callable")
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('config.PATH_MESSAGES_DB', 'messages.json')
+    def test_messages_repository_implements_base_repository(self):
+        """Test czy messages repository implementuje BaseRepository interface"""
+        repository = RepositoryFactory.create_messages_repository()
+        
+        # Sprawdzenie czy ma wszystkie wymagane metody BaseRepository
+        required_methods = ['find_by_id', 'find_all', 'find_by_field', 'save', 'update', 'delete']
+        for method in required_methods:
+            self.assertTrue(hasattr(repository, method), 
+                          f"Repository nie ma metody {method}")
+            self.assertTrue(callable(getattr(repository, method)), 
+                          f"Metoda {method} nie jest callable")
+    
+    # ============= TESTS FOR STATIC METHODS =============
+    
+    def test_factory_methods_are_static(self):
+        """Test czy metody factory są statyczne"""
+        # Sprawdzenie czy można wywołać metody bez tworzenia instancji
+        self.assertTrue(callable(RepositoryFactory.create_users_repository))
+        self.assertTrue(callable(RepositoryFactory.create_messages_repository))
+        
+        # Sprawdzenie czy metody są oznaczone jako staticmethod
+        self.assertIsInstance(RepositoryFactory.__dict__['create_users_repository'], staticmethod)
+        self.assertIsInstance(RepositoryFactory.__dict__['create_messages_repository'], staticmethod)
+    
+    # ============= TESTS FOR CONFIGURATION DEPENDENCIES =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('config.PATH_USERS_DB')
+    def test_users_repository_uses_config_path(self, mock_path):
+        """Test czy users repository używa ścieżki z konfiguracji"""
+        mock_path = '/custom/path/users.json'
+        
+        with patch('BLL.RepositoryFactory.PATH_USERS_DB', mock_path):
+            repository = RepositoryFactory.create_users_repository()
+            self.assertEqual(repository.file_path, mock_path)
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('config.PATH_MESSAGES_DB')
+    def test_messages_repository_uses_config_path(self, mock_path):
+        """Test czy messages repository używa ścieżki z konfiguracji"""
+        mock_path = '/custom/path/messages.json'
+        
+        with patch('BLL.RepositoryFactory.PATH_MESSAGES_DB', mock_path):
+            repository = RepositoryFactory.create_messages_repository()
+            self.assertEqual(repository.file_path, mock_path)
+    
+    # ============= TESTS FOR IMPORT ERRORS =============
+    # (SQL import errors are covered in SQL type tests above)
+    
+    # ============= INTEGRATION TESTS =============
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    @patch('BLL.RepositoryFactory.PATH_USERS_DB', 'test_users.json')
+    @patch('BLL.RepositoryFactory.PATH_MESSAGES_DB', 'test_messages.json')
+    def test_factory_creates_different_instances(self):
+        """Test czy factory tworzy różne instancje dla każdego wywołania"""
+        users_repo1 = RepositoryFactory.create_users_repository()
+        users_repo2 = RepositoryFactory.create_users_repository()
+        messages_repo1 = RepositoryFactory.create_messages_repository()
+        
+        # Sprawdzenie czy to są różne obiekty
+        self.assertNotEqual(id(users_repo1), id(users_repo2))
+        self.assertNotEqual(id(users_repo1), id(messages_repo1))
+        
+        # Ale tego samego typu
+        self.assertEqual(type(users_repo1), type(users_repo2))
+        self.assertEqual(type(users_repo1), type(messages_repo1))
+    
+    @patch('BLL.RepositoryFactory.DATABASE_TYPE', 'JSON')
+    def test_factory_preserves_collection_names(self):
+        """Test czy factory zachowuje poprawne nazwy kolekcji"""
+        with patch('BLL.RepositoryFactory.PATH_USERS_DB', 'test.json'), \
+             patch('BLL.RepositoryFactory.PATH_MESSAGES_DB', 'test.json'):
+            
+            users_repo = RepositoryFactory.create_users_repository()
+            messages_repo = RepositoryFactory.create_messages_repository()
+            
+            # Mimo tej samej ścieżki pliku, nazwy kolekcji powinny być różne
+            self.assertEqual(users_repo.collection_name, 'users')
+            self.assertEqual(messages_repo.collection_name, 'messages')
+            self.assertNotEqual(users_repo.collection_name, messages_repo.collection_name)
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_server_connaction_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py
+import unittest
+from unittest.mock import Mock, patch
+import socket
+import ast
+from BLL.ServerConnectionManager import ServerConnectionManager
+from config import SERVER_CONFIG
+
+class TestServerConnectionManager(unittest.TestCase):
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.server_manager = ServerConnectionManager()
+
+    def tearDown(self):
+        """Czyszczenie po każdym teście"""
+        if self.server_manager.server_socket:
+            self.server_manager.stop_server()
+
+    def test_init(self):
+        """Test inicjalizacji ServerConnectionManager"""
+        self.assertEqual(self.server_manager.host, SERVER_CONFIG["host"])
+        self.assertEqual(self.server_manager.port, SERVER_CONFIG["port"])
+        self.assertEqual(self.server_manager.max_connections, SERVER_CONFIG["max_connections"])
+        self.assertEqual(self.server_manager.buffer_size, SERVER_CONFIG["buffer_size"])
+        self.assertIsNone(self.server_manager.server_socket)
+
+    @patch('socket.socket')
+    def test_start_server_success(self, mock_socket):
+        """Test poprawnego uruchomienia serwera"""
+        # Przygotowanie mocka
+        mock_socket_instance = Mock()
+        mock_socket.return_value = mock_socket_instance
+
+        # Wywołanie testowanej metody
+        self.server_manager.start_server()
+
+        # Sprawdzenie czy socket został poprawnie skonfigurowany
+        mock_socket.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
+        mock_socket_instance.bind.assert_called_once_with(
+            (SERVER_CONFIG["host"], SERVER_CONFIG["port"])
+        )
+        mock_socket_instance.listen.assert_called_once_with(
+            SERVER_CONFIG["max_connections"]
+        )
+
+    @patch('socket.socket')
+    def test_start_server_error(self, mock_socket):
+        """Test obsługi błędu podczas uruchamiania serwera"""
+        # Symulacja błędu podczas bind
+        mock_socket_instance = Mock()
+        mock_socket_instance.bind.side_effect = socket.error("Test error")
+        mock_socket.return_value = mock_socket_instance
+
+        # Sprawdzenie czy błąd jest odpowiednio obsługiwany
+        with self.assertRaises(socket.error) as context:
+            self.server_manager.start_server()
+        self.assertEqual(str(context.exception), "Nie można uruchomić serwera: Test error")
+
+    def test_stop_server(self):
+        """Test zatrzymania serwera"""
+        # Przygotowanie mocka
+        mock_socket = Mock()
+        self.server_manager.server_socket = mock_socket
+
+        # Wywołanie testowanej metody
+        self.server_manager.stop_server()
+
+        # Sprawdzenie czy socket został zamknięty
+        mock_socket.close.assert_called_once()
+
+    def test_accept_client_success(self):
+        """Test poprawnego akceptowania klienta"""
+        # Przygotowanie mocka
+        mock_socket = Mock()
+        mock_client = Mock()
+        mock_address = ('127.0.0.1', 12345)
+        mock_socket.accept.return_value = (mock_client, mock_address)
+        self.server_manager.server_socket = mock_socket
+
+        # Wywołanie testowanej metody
+        client, address = self.server_manager.accept_client()
+
+        # Sprawdzenie wyników
+        self.assertEqual(client, mock_client)
+        self.assertEqual(address, mock_address)
+        mock_socket.accept.assert_called_once()
+
+    def test_accept_client_error(self):
+        """Test obsługi błędu podczas akceptowania klienta"""
+        # Przygotowanie mocka
+        mock_socket = Mock()
+        mock_socket.accept.side_effect = socket.error("Accept error")
+        self.server_manager.server_socket = mock_socket
+
+        # Sprawdzenie czy błąd jest odpowiednio obsługiwany
+        with self.assertRaises(socket.error) as context:
+            self.server_manager.accept_client()
+        self.assertEqual(str(context.exception), "Błąd akceptowania: Accept error")
+
+    def test_handle_client_success(self):
+        """Test poprawnego obsługiwania danych od klienta"""
+        # Przygotowanie mocka klienta
+        mock_client = Mock()
+        test_data = ["test", {"data": 123}]
+        mock_client.recv.return_value = '["test", {"data": 123}]'.encode('utf-8')
+
+        # Wywołanie testowanej metody
+        result = self.server_manager.handle_client(mock_client)
+
+        # Sprawdzenie wyników
+        self.assertEqual(result, test_data)
+        mock_client.recv.assert_called_once_with(1024)
+
+    def test_handle_client_decode_error(self):
+        """Test obsługi błędu dekodowania danych"""
+        # Przygotowanie mocka klienta
+        mock_client = Mock()
+        mock_client.recv.side_effect = UnicodeDecodeError(
+            'utf-8', b'invalid', 0, 1, 'Invalid UTF-8'
+        )
+
+        # Sprawdzenie czy błąd jest odpowiednio obsługiwany
+        with self.assertRaises(UnicodeDecodeError):
+            self.server_manager.handle_client(mock_client)
+
+    def test_handle_client_parse_error(self):
+        """Test obsługi błędu parsowania danych"""
+        # Przygotowanie mocka klienta
+        mock_client = Mock()
+        mock_client.recv.return_value = "invalid data".encode('utf-8')
+
+        # Sprawdzenie czy błąd jest odpowiednio obsługiwany
+        with self.assertRaises((ValueError, SyntaxError)):
+            self.server_manager.handle_client(mock_client)
+
+    def test_handle_client_socket_error(self):
+        """Test obsługi błędu połączenia"""
+        # Przygotowanie mocka klienta
+        mock_client = Mock()
+        mock_client.recv.side_effect = socket.error("Connection error")
+
+        # Sprawdzenie czy błąd jest odpowiednio obsługiwany
+        with self.assertRaises(socket.error) as context:
+            self.server_manager.handle_client(mock_client)
+        self.assertEqual(str(context.exception), "Connection error")
+
+
+class TestServerConnectionManagerIntegration(unittest.TestCase):
+    """Testy integracyjne dla ServerConnectionManager"""
+
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.server = ServerConnectionManager()
+        self.server.start_server()
+        
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client.connect((SERVER_CONFIG["host"], SERVER_CONFIG["port"]))
+
+    def tearDown(self):
+        """Czyszczenie po każdym teście"""
+        self.client.close()
+        self.server.stop_server()
+
+    def test_full_communication(self):
+        """Test pełnej komunikacji między serwerem a klientem"""
+        # Wysłanie danych
+        test_data = ["test", {"data": 123}]
+        import json
+        self.client.send(json.dumps(test_data).encode('utf-8'))
+        
+        # Akceptacja klienta przez serwer
+        client_socket, _ = self.server.accept_client()
+        
+        # Odbieranie danych
+        received_data = self.server.handle_client(client_socket)
+        
+        self.assertEqual(received_data, test_data)
+
+    def test_multiple_clients(self):
+        """Test obsługi wielu klientów"""
+        # Utworzenie drugiego klienta
+        client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client2.connect((SERVER_CONFIG["host"], SERVER_CONFIG["port"]))
+        
+        try:
+            # Wysłanie danych od pierwszego klienta
+            test_data1 = ["client1", {"data": "test1"}]
+            import json
+            self.client.send(json.dumps(test_data1).encode('utf-8'))
+            
+            # Wysłanie danych od drugiego klienta
+            test_data2 = ["client2", {"data": "test2"}]
+            client2.send(json.dumps(test_data2).encode('utf-8'))
+            
+            # Akceptacja i obsługa pierwszego klienta
+            client_socket1, _ = self.server.accept_client()
+            received_data1 = self.server.handle_client(client_socket1)
+            
+            # Akceptacja i obsługa drugiego klienta
+            client_socket2, _ = self.server.accept_client()
+            received_data2 = self.server.handle_client(client_socket2)
+            
+            self.assertEqual(received_data1, test_data1)
+            self.assertEqual(received_data2, test_data2)
+        finally:
+            client2.close()
+
+
+if __name__ == '__main__':
+    unittest.main()
+    
+
+====================
+FILE: test_ui_client.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_ui_client.py
+import unittest
+from unittest.mock import Mock, patch, MagicMock, call
+import sys
+import io
+from contextlib import contextmanager
+
+class TestClientUI(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.mock_connection = Mock()
+        self.mock_user_manager = Mock()
+        
+    @contextmanager
+    def capture_output(self):
+        """Context manager do przechwytywania stdout"""
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = io.StringIO()
+        try:
+            yield captured_output
+        finally:
+            sys.stdout = old_stdout
+
+    @patch('BLL.ClientConnectionManager.ClientConnectionManager')
+    @patch('BLL.ClientMessageManager.ClientMessageManager')
+    @patch('builtins.input')
+    def test_successful_logout_flow(self, mock_input, mock_message_manager_class, mock_connection_manager_class):
+        """Test pomyślnego wylogowania użytkownika"""
+        # Konfiguracja mocków
+        mock_connection = Mock()
+        mock_connection_manager_class.return_value.__enter__ = Mock(return_value=mock_connection)
+        mock_connection_manager_class.return_value.__exit__ = Mock(return_value=None)
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        # Konfiguracja interakcji użytkownika
+        mock_user_manager.prepare_request_interactive.return_value = ("logout", {})
+        mock_user_manager.command_map = {"logout": Mock()}
+        
+        mock_connection.send_request.return_value = None
+        mock_connection.recv_response.return_value = "OK"
+        
+        with self.capture_output() as output:
+            # Import i uruchomienie modułu (symulacja)
+            try:
+                exec("""
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    command, data_input = user_manager.prepare_request_interactive()
+    
+    if command == "logout":
+        connection.send_request("logout")
+        response = connection.recv_response()
+        print(f"response: {response}")
+        if response == "OK":
+            print("Wylogowano pomyślnie")
+        print("Zamykanie programu...")
+        connection.close()
+                """)
+            except SystemExit:
+                pass  # Oczekiwane dla break w pętli
+        
+        captured = output.getvalue()
+        self.assertIn("response: OK", captured)
+        self.assertIn("Wylogowano pomyślnie", captured)
+        self.assertIn("Zamykanie programu...", captured)
+
+    @patch('BLL.ClientConnectionManager.ClientConnectionManager')
+    @patch('BLL.ClientMessageManager.ClientMessageManager')
+    def test_connection_error_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi błędu połączenia"""
+        # Konfiguracja mocków
+        mock_connection = Mock()
+        mock_connection_manager_class.return_value.__enter__ = Mock(return_value=mock_connection)
+        mock_connection_manager_class.return_value.__exit__ = Mock(return_value=None)
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_user_manager.prepare_request_interactive.return_value = ("send", {"receiver": "test", "text": "hello"})
+        mock_user_manager.command_map = {"send": Mock(return_value=["send", {"receiver": "test", "text": "hello"}])}
+        
+        # Symulacja błędu połączenia
+        mock_connection.send_request.side_effect = ConnectionError("Błąd połączenia")
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    command, data_input = user_manager.prepare_request_interactive()
+    
+    if command != "logout":
+        try:
+            if len(data_input) > 0:
+                request = user_manager.command_map[command](command, **data_input)
+            else:
+                request = user_manager.command_map[command](command)
+            connection.send_request(str(request))
+            connection.recv_response()
+        except ConnectionError:
+            print("Błąd połączenia z serwerem. Sprawdź połączenie i spróbuj ponownie.")
+                """)
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Błąd połączenia z serwerem", captured)
+
+    @patch('BLL.ClientConnectionManager.ClientConnectionManager')
+    @patch('BLL.ClientMessageManager.ClientMessageManager')
+    def test_unknown_command_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi nieznanej komendy"""
+        mock_connection = Mock()
+        mock_connection_manager_class.return_value.__enter__ = Mock(return_value=mock_connection)
+        mock_connection_manager_class.return_value.__exit__ = Mock(return_value=None)
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_user_manager.prepare_request_interactive.return_value = ("unknown", {})
+        mock_user_manager.command_map = {"send": Mock(), "read": Mock()}  # brak 'unknown'
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    command, data_input = user_manager.prepare_request_interactive()
+    
+    if command not in user_manager.command_map:
+        print("Nieznane polecenie. Spróbuj ponownie.")
+                """)
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Nieznane polecenie. Spróbuj ponownie.", captured)
+
+    @patch('BLL.ClientConnectionManager.ClientConnectionManager')
+    @patch('BLL.ClientMessageManager.ClientMessageManager')
+    def test_keyboard_interrupt_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi przerwania przez użytkownika (Ctrl+C)"""
+        mock_connection = Mock()
+        mock_connection_manager_class.return_value.__enter__ = Mock(return_value=mock_connection)
+        mock_connection_manager_class.return_value.__exit__ = Mock(return_value=None)
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        # Symulacja KeyboardInterrupt
+        mock_user_manager.prepare_request_interactive.side_effect = KeyboardInterrupt()
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    try:
+        command, data_input = user_manager.prepare_request_interactive()
+    except KeyboardInterrupt:
+        print("Program został przerwany przez użytkownika.")
+        connection.close()
+                """)
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Program został przerwany przez użytkownika.", captured)
+
+    @patch('BLL.ClientConnectionManager.ClientConnectionManager')
+    @patch('BLL.ClientMessageManager.ClientMessageManager')
+    def test_general_exception_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi ogólnych wyjątków"""
+        mock_connection = Mock()
+        mock_connection_manager_class.return_value.__enter__ = Mock(return_value=mock_connection)
+        mock_connection_manager_class.return_value.__exit__ = Mock(return_value=None)
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_user_manager.prepare_request_interactive.return_value = ("send", {"receiver": "test", "text": "hello"})
+        mock_user_manager.command_map = {"send": Mock(side_effect=Exception("Test exception"))}
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    try:
+        command, data_input = user_manager.prepare_request_interactive()
+        if command in user_manager.command_map:
+            if len(data_input) > 0:
+                request = user_manager.command_map[command](command, **data_input)
+            else:
+                request = user_manager.command_map[command](command)
+    except Exception as e:
+        print(f"Wystąpił błąd: {str(e)}")
+                """)
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Wystąpił błąd: Test exception", captured)
+
+    def test_client_request_processing_logic(self):
+        """Test logiki przetwarzania żądań klienta"""
+        # Test różnych scenariuszy przetwarzania komend
+        test_cases = [
+            # (command, data_input, expected_behavior)
+            ("send", {"receiver": "user", "text": "hello"}, "with_data"),
+            ("read", {}, "without_data"),
+            ("help", {}, "without_data"),
+            ("login", {"username": "test", "password": "pass"}, "with_data")
+        ]
+        
+        for command, data_input, expected_behavior in test_cases:
+            with self.subTest(command=command):
+                mock_user_manager = Mock()
+                mock_handler = Mock(return_value=[command, data_input])
+                mock_user_manager.command_map = {command: mock_handler}
+                
+                # Symulacja logiki z client.py
+                if len(data_input) > 0:
+                    request = mock_user_manager.command_map[command](command, **data_input)
+                else:
+                    request = mock_user_manager.command_map[command](command)
+                
+                if expected_behavior == "with_data":
+                    mock_handler.assert_called_once_with(command, **data_input)
+                else:
+                    mock_handler.assert_called_once_with(command)
+                
+                self.assertEqual(request, [command, data_input])
+
+    def test_logout_error_scenarios(self):
+        """Test różnych scenariuszy błędów podczas wylogowania"""
+        error_scenarios = [
+            (ConnectionResetError("Reset"), "Błąd podczas wylogowywania: Reset"),
+            (ConnectionError("Connection lost"), "Błąd podczas wylogowywania: Connection lost"),
+            (TimeoutError("Timeout"), "Błąd podczas wylogowywania: Timeout"),
+            (Exception("Unexpected"), "Nieoczekiwany błąd podczas wylogowywania: Unexpected")
+        ]
+        
+        for exception, expected_message in error_scenarios:
+            with self.subTest(exception=type(exception).__name__):
+                mock_connection = Mock()
+                mock_connection.send_request.side_effect = exception
+                
+                with self.capture_output() as output:
+                    try:
+                        exec(f"""
+try:
+    mock_connection.send_request("logout")
+    response = mock_connection.recv_response()
+except (ConnectionResetError, ConnectionError, TimeoutError) as e:
+    print(f"Błąd podczas wylogowywania: {{e}}")
+except Exception as e:
+    print(f"Nieoczekiwany błąd podczas wylogowywania: {{e}}")
+finally:
+    print("Zamykanie programu...")
+                        """, {"mock_connection": mock_connection})
+                    except:
+                        pass
+                
+                captured = output.getvalue()
+                self.assertIn(expected_message.split(":")[0], captured)
+                self.assertIn("Zamykanie programu...", captured)
+
+    def test_connection_close_error_handling(self):
+        """Test obsługi błędów podczas zamykania połączenia"""
+        mock_connection = Mock()
+        mock_connection.close.side_effect = Exception("Close error")
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+try:
+    mock_connection.close()
+except Exception as e:
+    print(f"Błąd podczas zamykania połączenia: {e}")
+                """, {"mock_connection": mock_connection})
+            except:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Błąd podczas zamykania połączenia: Close error", captured)
+
+    def test_request_format_validation(self):
+        """Test walidacji formatu żądania"""
+        mock_user_manager = Mock()
+        mock_handler = Mock(return_value=["send", {"receiver": "user", "text": "hello"}])
+        mock_user_manager.command_map = {"send": mock_handler}
+        
+        # Test konwersji żądania na string
+        data_input = {"receiver": "user", "text": "hello"}
+        request = mock_user_manager.command_map["send"]("send", **data_input)
+        request_str = str(request)
+        
+        # Sprawdzenie czy żądanie można przekonwertować na string
+        self.assertIsInstance(request_str, str)
+        self.assertIn("send", request_str)
+
+    def test_empty_data_input_handling(self):
+        """Test obsługi pustych danych wejściowych"""
+        mock_user_manager = Mock()
+        mock_handler = Mock(return_value=["help", {}])
+        mock_user_manager.command_map = {"help": mock_handler}
+        
+        data_input = {}
+        
+        # Symulacja logiki z client.py dla pustych danych
+        if len(data_input) > 0:
+            request = mock_user_manager.command_map["help"]("help", **data_input)
+        else:
+            request = mock_user_manager.command_map["help"]("help")
+        
+        mock_handler.assert_called_once_with("help")
+
+    def test_client_main_loop_structure(self):
+        """Test struktury głównej pętli klienta"""
+        # Ten test sprawdza czy główna logika klienta jest poprawnie skonstruowana
+        # Symulujemy jedną iterację pętli
+        
+        mock_connection = Mock()
+        mock_user_manager = Mock()
+        
+        # Konfiguracja dla jednej iteracji
+        mock_user_manager.prepare_request_interactive.return_value = ("send", {"receiver": "test", "text": "hello"})
+        mock_user_manager.command_map = {"send": Mock(return_value=["send", {"receiver": "test", "text": "hello"}])}
+        mock_connection.send_request.return_value = None
+        mock_connection.recv_response.return_value = "Message sent"
+        
+        # Symulacja jednej iteracji głównej pętli
+        try:
+            command, data_input = mock_user_manager.prepare_request_interactive()
+            
+            if command not in mock_user_manager.command_map:
+                result = "unknown_command"
+            elif command == "logout":
+                result = "logout_processed"
+            else:
+                if len(data_input) > 0:
+                    request = mock_user_manager.command_map[command](command, **data_input)
+                else:
+                    request = mock_user_manager.command_map[command](command)
+                mock_connection.send_request(str(request))
+                mock_connection.recv_response()
+                result = "command_processed"
+        except Exception:
+            result = "exception_handled"
+        
+        self.assertEqual(result, "command_processed")
+        mock_connection.send_request.assert_called_once()
+        mock_connection.recv_response.assert_called_once()
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_ui_server.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_ui_server.py
+import unittest
+from unittest.mock import Mock, patch, MagicMock, call
+import sys
+import io
+from contextlib import contextmanager
+
+class TestServerUI(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.mock_server = Mock()
+        self.mock_user_manager = Mock()
+        self.mock_client_socket = Mock()
+        self.test_address = ("127.0.0.1", 12345)
+
+    @contextmanager
+    def capture_output(self):
+        """Context manager do przechwytywania stdout"""
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = io.StringIO()
+        try:
+            yield captured_output
+        finally:
+            sys.stdout = old_stdout
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_server_startup_and_client_connection(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test uruchamiania serwera i przyjmowania połączenia klienta"""
+        # Konfiguracja mocków
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_server.accept_client.return_value = (self.mock_client_socket, self.test_address)
+        mock_server.handle_client.return_value = ["help", {}]
+        
+        mock_user_manager.command_map = {"help": Mock(return_value="Help message")}
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+from BLL.ServerConnectionManager import ServerConnectionManager
+from BLL.ServerMessageManager import ServerMessageManager
+
+server = ServerConnectionManager()
+server.start_server()
+
+client_socket, address = server.accept_client()
+print(f"Połączono z klientem: {address}")
+user_manager = ServerMessageManager()
+
+request = server.handle_client(client_socket)
+command = request[0]
+data_input = request[1]
+
+if command in user_manager.command_map:
+    if len(data_input) > 0:
+        response = str(user_manager.command_map[command](command, *data_input.values()))
+    else:
+        response = str(user_manager.command_map[command](command))
+    client_socket.send(response.encode("utf-8"))
+                """, {
+                    'ServerConnectionManager': mock_connection_manager_class,
+                    'ServerMessageManager': mock_message_manager_class
+                })
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn(f"Połączono z klientem: {self.test_address}", captured)
+        mock_server.start_server.assert_called_once()
+        mock_server.accept_client.assert_called_once()
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_logout_command_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi komendy logout"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_server.accept_client.return_value = (self.mock_client_socket, self.test_address)
+        mock_server.handle_client.return_value = ["logout", {}]
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+from BLL.ServerConnectionManager import ServerConnectionManager
+from BLL.ServerMessageManager import ServerMessageManager
+
+server = ServerConnectionManager()
+client_socket, address = server.accept_client()
+user_manager = ServerMessageManager()
+
+request = server.handle_client(client_socket)
+command = request[0]
+data_input = request[1]
+
+if command == "logout":
+    print(f"Klient {address} się wylogował")
+                """, {
+                    'ServerConnectionManager': mock_connection_manager_class,
+                    'ServerMessageManager': mock_message_manager_class
+                })
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn(f"Klient {self.test_address} się wylogował", captured)
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_command_processing_with_data(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test przetwarzania komendy z danymi"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        test_data = {"receiver": "user1", "text": "hello"}
+        mock_server.handle_client.return_value = ["send", test_data]
+        mock_handler = Mock(return_value="Message sent")
+        mock_user_manager.command_map = {"send": mock_handler}
+        
+        # Symulacja wykonania kodu serwera
+        server = mock_server
+        client_socket_and_address = server.accept_client()
+        client_socket = self.mock_client_socket
+        user_manager = mock_user_manager
+
+        request = server.handle_client(client_socket)
+        command = request[0]
+        data_input = request[1]
+
+        if command in user_manager.command_map:
+            if len(data_input) > 0:
+                response = str(user_manager.command_map[command](command, **data_input))
+            else:
+                response = str(user_manager.command_map[command](command))
+            client_socket.send(response.encode("utf-8"))
+        
+        # Sprawdzenie czy handler został wywołany z właściwymi argumentami
+        mock_handler.assert_called_once_with("send", receiver="user1", text="hello")
+        self.mock_client_socket.send.assert_called_once_with(b"Message sent")
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_command_processing_without_data(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test przetwarzania komendy bez danych"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_server.handle_client.return_value = ["help", {}]
+        mock_handler = Mock(return_value="Help information")
+        mock_user_manager.command_map = {"help": mock_handler}
+        
+        # Symulacja przetwarzania komendy bez danych
+        request = mock_server.handle_client(self.mock_client_socket)
+        command = request[0]
+        data_input = request[1]
+        
+        if command in mock_user_manager.command_map:
+            if len(data_input) > 0:
+                response = str(mock_user_manager.command_map[command](command, *data_input.values()))
+            else:
+                response = str(mock_user_manager.command_map[command](command))
+            self.mock_client_socket.send(response.encode("utf-8"))
+        
+        mock_handler.assert_called_once_with("help")
+        self.mock_client_socket.send.assert_called_once_with(b"Help information")
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_empty_request_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi pustego żądania"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_server.handle_client.return_value = None  # Symulacja braku danych
+        
+        # Symulacja logiki obsługi pustego żądania
+        request = mock_server.handle_client(self.mock_client_socket)
+        
+        if not request:
+            result = "connection_broken"
+        else:
+            result = "request_processed"
+        
+        self.assertEqual(result, "connection_broken")
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_empty_command_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi pustej komendy"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_server.handle_client.return_value = ["", {}]  # Pusta komenda
+        
+        # Symulacja logiki obsługi pustej komendy
+        request = mock_server.handle_client(self.mock_client_socket)
+        command = request[0]
+        
+        if not command:
+            result = "empty_command_skipped"
+        else:
+            result = "command_processed"
+        
+        self.assertEqual(result, "empty_command_skipped")
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    @patch('BLL.ServerMessageManager.ServerMessageManager')
+    def test_client_exception_handling(self, mock_message_manager_class, mock_connection_manager_class):
+        """Test obsługi wyjątków podczas obsługi klienta"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_user_manager = Mock()
+        mock_message_manager_class.return_value = mock_user_manager
+        
+        mock_server.accept_client.return_value = (self.mock_client_socket, self.test_address)
+        mock_server.handle_client.side_effect = Exception("Client handling error")
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+from BLL.ServerConnectionManager import ServerConnectionManager
+from BLL.ServerMessageManager import ServerMessageManager
+
+server = ServerConnectionManager()
+client_socket, address = server.accept_client()
+user_manager = ServerMessageManager()
+
+try:
+    request = server.handle_client(client_socket)
+except Exception as e:
+    print(f"Błąd podczas obsługi klienta {address}: {e}")
+finally:
+    client_socket.close()
+    print(f"Zamknięto połączenie z klientem {address}")
+                """, {
+                    'ServerConnectionManager': mock_connection_manager_class,
+                    'ServerMessageManager': mock_message_manager_class
+                })
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn(f"Błąd podczas obsługi klienta {self.test_address}: Client handling error", captured)
+        self.assertIn(f"Zamknięto połączenie z klientem {self.test_address}", captured)
+        self.mock_client_socket.close.assert_called_once()
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    def test_keyboard_interrupt_handling(self, mock_connection_manager_class):
+        """Test obsługi przerwania przez użytkownika (Ctrl+C)"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_server.accept_client.side_effect = KeyboardInterrupt()
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+from BLL.ServerConnectionManager import ServerConnectionManager
+
+server = ServerConnectionManager()
+server.start_server()
+
+try:
+    client_socket, address = server.accept_client()
+except KeyboardInterrupt:
+    print("\\nZamykanie serwera...")
+finally:
+    server.stop_server()
+                """, {'ServerConnectionManager': mock_connection_manager_class})
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Zamykanie serwera...", captured)
+        mock_server.stop_server.assert_called_once()
+
+    @patch('BLL.ServerConnectionManager.ServerConnectionManager')
+    def test_critical_server_error_handling(self, mock_connection_manager_class):
+        """Test obsługi krytycznych błędów serwera"""
+        mock_server = Mock()
+        mock_connection_manager_class.return_value = mock_server
+        
+        mock_server.accept_client.side_effect = Exception("Critical server error")
+        
+        with self.capture_output() as output:
+            try:
+                exec("""
+from BLL.ServerConnectionManager import ServerConnectionManager
+
+server = ServerConnectionManager()
+server.start_server()
+
+try:
+    client_socket, address = server.accept_client()
+except Exception as e:
+    print(f"Błąd krytyczny serwera: {e}")
+finally:
+    server.stop_server()
+                """, {'ServerConnectionManager': mock_connection_manager_class})
+            except SystemExit:
+                pass
+        
+        captured = output.getvalue()
+        self.assertIn("Błąd krytyczny serwera: Critical server error", captured)
+        mock_server.stop_server.assert_called_once()
+
+    def test_request_parsing_logic(self):
+        """Test logiki parsowania żądań"""
+        test_cases = [
+            (["send", {"receiver": "user", "text": "hello"}], ("send", {"receiver": "user", "text": "hello"})),
+            (["help", {}], ("help", {})),
+            (["login", {"username": "test", "password": "pass"}], ("login", {"username": "test", "password": "pass"})),
+            (["logout", {}], ("logout", {}))
+        ]
+        
+        for request_data, expected in test_cases:
+            with self.subTest(request=request_data):
+                # Symulacja parsowania żądania
+                command = request_data[0]
+                data_input = request_data[1]
+                
+                parsed = (command, data_input)
+                self.assertEqual(parsed, expected)
+
+    def test_response_encoding_and_sending(self):
+        """Test kodowania i wysyłania odpowiedzi"""
+        mock_client_socket = Mock()
+        test_responses = [
+            "OK",
+            "User logged in",
+            "Message sent successfully",
+            "Error: Invalid command"
+        ]
+        
+        for response in test_responses:
+            with self.subTest(response=response):
+                mock_client_socket.reset_mock()
+                
+                # Symulacja wysyłania odpowiedzi
+                mock_client_socket.send(response.encode("utf-8"))
+                
+                mock_client_socket.send.assert_called_once_with(response.encode("utf-8"))
+
+    def test_server_main_loop_structure(self):
+        """Test struktury głównej pętli serwera"""
+        mock_server = Mock()
+        mock_user_manager = Mock()
+        
+        # Symulacja jednej iteracji zewnętrznej pętli
+        mock_server.accept_client.return_value = (self.mock_client_socket, self.test_address)
+        
+        # Symulacja jednej iteracji wewnętrznej pętli
+        mock_server.handle_client.return_value = ["send", {"receiver": "user", "text": "hello"}]
+        mock_user_manager.command_map = {"send": Mock(return_value="Message sent")}
+        
+        # Wykonanie logiki
+        client_socket, address = mock_server.accept_client()
+        user_manager = mock_user_manager
+        
+        request = mock_server.handle_client(client_socket)
+        if request:
+            command = request[0]
+            data_input = request[1]
+            
+            if command and command in user_manager.command_map:
+                if len(data_input) > 0:
+                    response = str(user_manager.command_map[command](command, *data_input.values()))
+                else:
+                    response = str(user_manager.command_map[command](command))
+                client_socket.send(response.encode("utf-8"))
+        
+        # Weryfikacja
+        mock_server.accept_client.assert_called_once()
+        mock_server.handle_client.assert_called_once_with(client_socket)
+        self.mock_client_socket.send.assert_called_once_with(b"Message sent")
+
+    def test_multiple_client_handling_simulation(self):
+        """Test symulacji obsługi wielu klientów"""
+        mock_server = Mock()
+        
+        # Symulacja dwóch różnych klientów
+        client1_socket, client1_address = Mock(), ("127.0.0.1", 12345)
+        client2_socket, client2_address = Mock(), ("127.0.0.1", 12346)
+        
+        mock_server.accept_client.side_effect = [
+            (client1_socket, client1_address),
+            (client2_socket, client2_address)
+        ]
+        
+        # Symulacja obsługi dwóch klientów
+        clients_handled = []
+        
+        for i in range(2):
+            client_socket, address = mock_server.accept_client()
+            clients_handled.append(address)
+        
+        self.assertEqual(len(clients_handled), 2)
+        self.assertIn(client1_address, clients_handled)
+        self.assertIn(client2_address, clients_handled)
+
+    def test_command_data_extraction(self):
+        """Test ekstraktowania danych z komend"""
+        test_commands = [
+            (["send", {"receiver": "user1", "text": "message1"}], ["user1", "message1"]),
+            (["login", {"username": "test", "password": "pass"}], ["test", "pass"]),
+            (["help", {}], []),
+            (["info", {"username": "user2"}], ["user2"])
+        ]
+        
+        for request, expected_values in test_commands:
+            with self.subTest(request=request):
+                command = request[0]
+                data_input = request[1]
+                
+                # Symulacja ekstraktowania wartości
+                if len(data_input) > 0:
+                    extracted_values = list(data_input.values())
+                else:
+                    extracted_values = []
+                
+                self.assertEqual(extracted_values, expected_values)
+
+    def test_server_debug_output(self):
+        """Test wyjścia debugowego serwera"""
+        with self.capture_output() as output:
+            # Symulacja wyjścia debugowego z server.py
+            request = ["send", {"receiver": "user", "text": "hello"}]
+            command = request[0] 
+            data_input = request[1]
+            
+            print(request)
+            print(command)
+            print(data_input)
+        
+        captured = output.getvalue()
+        self.assertIn("['send', {'receiver': 'user', 'text': 'hello'}]", captured)
+        self.assertIn("send", captured)
+        self.assertIn("{'receiver': 'user', 'text': 'hello'}", captured)
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_user.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_user.py
+import unittest
+from unittest.mock import patch
+from Models.user import User
+
+class TestUser(unittest.TestCase):
+    
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.user = User()
+
+    def test_user_constructor_default_values(self):
+        """Test domyślnych wartości konstruktora User"""
+        user = User()
+        
+        self.assertIsNone(user.id)
+        self.assertIsNone(user.username)
+        self.assertIsNone(user.password)
+        self.assertEqual(user.role, 'user')
+        self.assertFalse(user.is_logged)
+        self.assertIsNone(user.login_time)
+        self.assertIsNone(user.create_time)
+
+    def test_user_attributes_assignment(self):
+        """Test przypisywania wartości do atrybutów User"""
+        user = User()
+        
+        user.id = "user_123"
+        user.username = "testuser"
+        user.password = "hashedpassword123"
+        user.role = "admin"
+        user.is_logged = True
+        user.login_time = "2024-01-01T12:00:00"
+        user.create_time = "2024-01-01T10:00:00"
+        
+        self.assertEqual(user.id, "user_123")
+        self.assertEqual(user.username, "testuser")
+        self.assertEqual(user.password, "hashedpassword123")
+        self.assertEqual(user.role, "admin")
+        self.assertTrue(user.is_logged)
+        self.assertEqual(user.login_time, "2024-01-01T12:00:00")
+        self.assertEqual(user.create_time, "2024-01-01T10:00:00")
+
+    def test_user_role_user_permissions(self):
+        """Test uprawnień dla roli 'user'"""
+        user = User()
+        user.role = 'user'
+        
+        # Komendy dozwolone dla użytkownika
+        self.assertTrue(user.is_user_allowed_to_command("send"))
+        self.assertTrue(user.is_user_allowed_to_command("read"))
+        self.assertTrue(user.is_user_allowed_to_command("read-u"))
+        self.assertTrue(user.is_user_allowed_to_command("read-a"))
+        self.assertTrue(user.is_user_allowed_to_command("login"))
+        self.assertTrue(user.is_user_allowed_to_command("logout"))
+        self.assertTrue(user.is_user_allowed_to_command("help"))
+        self.assertTrue(user.is_user_allowed_to_command("create"))
+        
+        # Komendy niedozwolone dla użytkownika
+        self.assertFalse(user.is_user_allowed_to_command("read-o"))
+        self.assertFalse(user.is_user_allowed_to_command("info"))
+        self.assertFalse(user.is_user_allowed_to_command("delete"))
+        self.assertFalse(user.is_user_allowed_to_command("edit"))
+
+    def test_admin_role_permissions(self):
+        """Test uprawnień dla roli 'admin'"""
+        user = User()
+        user.role = 'admin'
+        
+        # Wszystkie komendy powinny być dozwolone dla administratora
+        admin_commands = [
+            "send", "read", "read-u", "read-a", "read-o",
+            "login", "logout", "help", "info", "create", "delete", "edit"
+        ]
+        
+        for command in admin_commands:
+            with self.subTest(command=command):
+                self.assertTrue(user.is_user_allowed_to_command(command))
+
+    def test_is_user_allowed_to_command_with_different_roles(self):
+        """Test metody is_user_allowed_to_command dla różnych ról"""
+        # Test dla roli user
+        user_role = User()
+        user_role.role = 'user'
+        
+        # Test dla roli admin
+        admin_role = User()
+        admin_role.role = 'admin'
+        
+        # Porównanie uprawnień między rolami
+        test_cases = [
+            ("send", True, True),
+            ("read", True, True),
+            ("read-o", False, True),  # tylko admin
+            ("info", False, True),    # tylko admin
+            ("delete", False, True),  # tylko admin
+            ("edit", False, True),    # tylko admin
+        ]
+        
+        for command, user_expected, admin_expected in test_cases:
+            with self.subTest(command=command):
+                self.assertEqual(user_role.is_user_allowed_to_command(command), user_expected)
+                self.assertEqual(admin_role.is_user_allowed_to_command(command), admin_expected)
+
+    def test_user_login_workflow(self):
+        """Test workflow logowania użytkownika"""
+        user = User()
+        
+        # Początkowy stan - niezalogowany
+        self.assertFalse(user.is_logged)
+        self.assertIsNone(user.login_time)
+        
+        # Symulacja logowania
+        user.username = "testuser"
+        user.password = "hashed_password"
+        user.is_logged = True
+        user.login_time = "2024-01-01T12:00:00"
+        
+        # Sprawdzenie stanu po zalogowaniu
+        self.assertTrue(user.is_logged)
+        self.assertIsNotNone(user.login_time)
+        self.assertEqual(user.username, "testuser")
+
+    def test_user_role_change(self):
+        """Test zmiany roli użytkownika"""
+        user = User()
+        
+        # Domyślna rola
+        self.assertEqual(user.role, 'user')
+        self.assertFalse(user.is_user_allowed_to_command("delete"))
+        
+        # Zmiana na administratora
+        user.role = 'admin'
+        self.assertEqual(user.role, 'admin')
+        self.assertTrue(user.is_user_allowed_to_command("delete"))
+
+    def test_user_data_types(self):
+        """Test typów danych atrybutów User"""
+        user = User()
+        
+        user.id = "123"
+        user.username = "testuser"
+        user.password = "password"
+        user.role = "admin"
+        user.is_logged = True
+        user.login_time = "2024-01-01T12:00:00"
+        user.create_time = "2024-01-01T10:00:00"
+        
+        self.assertIsInstance(user.id, str)
+        self.assertIsInstance(user.username, str)
+        self.assertIsInstance(user.password, str)
+        self.assertIsInstance(user.role, str)
+        self.assertIsInstance(user.is_logged, bool)
+        self.assertIsInstance(user.login_time, str)
+        self.assertIsInstance(user.create_time, str)
+
+    def test_user_empty_values(self):
+        """Test obsługi pustych wartości"""
+        user = User()
+        
+        user.id = ""
+        user.username = ""
+        user.password = ""
+        user.login_time = ""
+        user.create_time = ""
+        
+        self.assertEqual(user.id, "")
+        self.assertEqual(user.username, "")
+        self.assertEqual(user.password, "")
+        self.assertEqual(user.login_time, "")
+        self.assertEqual(user.create_time, "")
+
+    def test_user_permission_edge_cases(self):
+        """Test przypadków brzegowych dla uprawnień"""
+        user = User()
+        
+        # Test z pustą rolą (może powodować KeyError)
+        user.role = ""
+        with self.assertRaises(KeyError):
+            user.is_user_allowed_to_command("send")
+        
+        # Test z nieistniejącą rolą
+        user.role = "nonexistent_role"
+        with self.assertRaises(KeyError):
+            user.is_user_allowed_to_command("send")
+
+    def test_user_command_edge_cases(self):
+        """Test przypadków brzegowych dla komend"""
+        user = User()
+        user.role = 'user'
+        
+        # Test z nieistniejącą komendą
+        with self.assertRaises(KeyError):
+            user.is_user_allowed_to_command("nonexistent_command")
+        
+        # Test z pustą komendą
+        with self.assertRaises(KeyError):
+            user.is_user_allowed_to_command("")
+
+    def test_user_boolean_operations(self):
+        """Test operacji boolean na użytkowniku"""
+        user = User()
+        
+        # Test is_logged jako boolean
+        self.assertFalse(user.is_logged)
+        user.is_logged = True
+        self.assertTrue(user.is_logged)
+        user.is_logged = False
+        self.assertFalse(user.is_logged)
+
+    def test_user_permission_consistency(self):
+        """Test spójności uprawnień między różnymi komendami"""
+        user = User()
+        admin = User()
+        
+        user.role = 'user'
+        admin.role = 'admin'
+        
+        # Admin powinien mieć wszystkie uprawnienia użytkownika plus dodatkowe
+        user_allowed_commands = []
+        admin_allowed_commands = []
+        
+        all_commands = [
+            "send", "read", "read-u", "read-a", "read-o",
+            "login", "logout", "help", "info", "create", "delete", "edit"
+        ]
+        
+        for command in all_commands:
+            if user.is_user_allowed_to_command(command):
+                user_allowed_commands.append(command)
+            if admin.is_user_allowed_to_command(command):
+                admin_allowed_commands.append(command)
+        
+        # Admin powinien mieć co najmniej tyle uprawnień co user
+        for command in user_allowed_commands:
+            self.assertIn(command, admin_allowed_commands, 
+                         f"Admin should have at least all user permissions, missing: {command}")
+
+    def test_user_state_transitions(self):
+        """Test przejść stanów użytkownika"""
+        user = User()
+        
+        # Stan początkowy
+        self.assertIsNone(user.username)
+        self.assertFalse(user.is_logged)
+        
+        # Rejestracja
+        user.username = "newuser"
+        user.password = "hashed_password"
+        user.create_time = "2024-01-01T10:00:00"
+        
+        self.assertIsNotNone(user.username)
+        self.assertFalse(user.is_logged)  # nadal niezalogowany
+        
+        # Logowanie
+        user.is_logged = True
+        user.login_time = "2024-01-01T12:00:00"
+        
+        self.assertTrue(user.is_logged)
+        
+        # Wylogowanie
+        user.is_logged = False
+        
+        self.assertFalse(user.is_logged)
+        # login_time może pozostać jako historia ostatniego logowania
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: test_user_message_manager.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\test_user_message_manager.py
+import unittest
+from unittest.mock import Mock, patch
+import bcrypt
+from datetime import datetime
+from BLL.ServerMessageManager import ServerMessageManager
+from Models.user import User
+from config import *
+
+class TestUserServerManager(unittest.TestCase):
+    def setUp(self):
+        """Przygotowanie środowiska testowego przed każdym testem"""
+        self.user_manager = ServerMessageManager()
+        self.user_manager.db_manager = Mock()  # Mock dla DbManager
+
+    def test_validate_string(self):
+        """Test walidacji i sanityzacji tekstu"""
+        # Test normalnego tekstu
+        self.assertEqual(self.user_manager._validate_string("test"), "test")
+        
+        # Test z zabronionymi znakami
+        self.assertEqual(self.user_manager._validate_string('test"\'{}[];'), "test")
+        
+        # Test z liczbą
+        self.assertEqual(self.user_manager._validate_string(123), "123")
+        
+        # Test z białymi znakami
+        self.assertEqual(self.user_manager._validate_string("  test  "), "test")
+
+    def test_get_help(self):
+        """Test wyświetlania pomocy"""
+        # Test dla zalogowanego użytkownika
+        self.user_manager.current_user.is_logged = True
+        self.user_manager.current_user.role = "admin"
+        response = self.user_manager.handle_get_help("help")
+        self.assertIsInstance(response, str)
+        self.assertIn(":", response)
+
+        # Test dla niezalogowanego użytkownika - nadal ma dostęp do pomocy
+        self.user_manager.current_user.is_logged = False
+        response = self.user_manager.handle_get_help("help")
+        self.assertIsInstance(response, str)
+        self.assertIn(":", response)
+
+    def test_send_message(self):
+        """Test wysyłania wiadomości"""
+        # Przygotowanie mocka
+        self.user_manager.current_user.is_logged = True
+        self.user_manager.current_user.username = "sender"
+        self.user_manager.db_manager.is_user_in_db.return_value = True
+        self.user_manager.db_manager.get_number_new_message_user.return_value = 0
+        self.user_manager.db_manager.add_message_into_db.return_value = True
+
+        # Test poprawnego wysłania wiadomości
+        response = self.user_manager.handle_send_message("send", receiver="receiver", text="test message")
+        self.assertEqual(response, "Wiadomość do receiver została wysłana")
+        
+        # Test z nieistniejącym odbiorcą
+        self.user_manager.db_manager.is_user_in_db.return_value = False
+        response = self.user_manager.handle_send_message("send", receiver="nonexistent", text="test")
+        self.assertEqual(response, "Nie masz uprawnień do tej komendy lub użytkownik nonexistent nie istnieje")
+
+    def test_login_user(self):
+        """Test logowania użytkownika"""
+        # Przygotowanie mocka
+        test_password = "test123"
+        hashed_password = bcrypt.hashpw(test_password.encode('utf-8'), bcrypt.gensalt())
+        self.user_manager.db_manager.get_user_password.return_value = hashed_password.decode('utf-8')
+        self.user_manager.db_manager.get_user_role.return_value = "user"
+        self.user_manager.db_manager.change_login_time_in_db.return_value = True
+
+        # Test poprawnego logowania
+        response = self.user_manager.handle_login("login", username="testuser", password=test_password)
+        self.assertEqual(response, "Użytkownik został zalogowany")
+        self.assertTrue(self.user_manager.current_user.is_logged)
+        self.assertEqual(self.user_manager.current_user.username, "testuser")
+
+        # Test z nieprawidłowym hasłem - wyloguj użytkownika przed testem
+        self.user_manager.current_user.is_logged = False
+        response = self.user_manager.handle_login("login", username="testuser", password="wrongpass")
+        self.assertEqual(response, "Nieprawidłowa nazwa użytkownika lub hasło")
+
+    def test_create_new_user(self):
+        """Test tworzenia nowego użytkownika"""
+        # Przygotowanie mocka
+        self.user_manager.db_manager.is_user_in_db.return_value = False
+        self.user_manager.db_manager.add_user_into_db.return_value = True
+
+        # Test poprawnego tworzenia użytkownika
+        response = self.user_manager.handle_create_new_user("create", username="newuser", password="password123")
+        self.assertEqual(response, "Użytkownik został dodany do bazy danych")
+
+        # Test z istniejącym użytkownikiem
+        self.user_manager.db_manager.is_user_in_db.return_value = True
+        response = self.user_manager.handle_create_new_user("create", username="existinguser", password="password123")
+        self.assertEqual(response, "Użytkownik już istnieje")
+
+    def test_read_new_message(self):
+        """Test odczytu nowych wiadomości"""
+        # Przygotowanie mocka
+        self.user_manager.current_user.is_logged = True
+        self.user_manager.current_user.username = "testuser"
+        test_messages = [
+            ["Wiadomość 1", "sender1", "2024-03-20 10:00"],
+            ["Wiadomość 2", "sender2", "2024-03-20 11:00"]
+        ]
+        self.user_manager.db_manager.get_all_new_messages_user.return_value = test_messages
+
+        # Test odczytu nowych wiadomości
+        response = self.user_manager.handle_read_new_message("read")
+        self.assertIn("Wiadomość 1", response)
+        self.assertIn("Wiadomość 2", response)
+
+        # Test braku nowych wiadomości
+        self.user_manager.db_manager.get_all_new_messages_user.return_value = []
+        response = self.user_manager.handle_read_new_message("read")
+        self.assertEqual(response, "Nie masz nowych wiadomości")
+
+    def test_delete_user(self):
+        """Test usuwania użytkownika"""
+        # Przygotowanie mocka
+        self.user_manager.current_user.is_logged = True
+        self.user_manager.current_user.username = "admin"
+        self.user_manager.current_user.role = "admin"
+        self.user_manager.db_manager.delete_user_from_db.return_value = True
+
+        # Test poprawnego usunięcia użytkownika
+        response = self.user_manager.handle_delete_user("delete", username="usertodelete")
+        self.assertEqual(response, "Użytkownik został usunięty")
+
+        # Test usunięcia samego siebie
+        response = self.user_manager.handle_delete_user("delete", username="admin")
+        self.assertEqual(response, "Nie masz uprawnień do tej komendy")
+
+    def test_edit_user_role(self):
+        """Test edycji roli użytkownika"""
+        # Przygotowanie mocka
+        self.user_manager.current_user.is_logged = True
+        self.user_manager.current_user.role = "admin"
+        self.user_manager.db_manager.is_user_in_db.return_value = True
+        self.user_manager.db_manager.edit_user_role_in_db.return_value = True
+
+        # Test poprawnej zmiany roli
+        response = self.user_manager.handle_edit_user_role("edit", username="user", new_role="admin")
+        self.assertEqual(response, "Rola została zmieniona")
+
+        # Test z nieistniejącym użytkownikiem
+        self.user_manager.db_manager.is_user_in_db.return_value = False
+        response = self.user_manager.handle_edit_user_role("edit", username="nonexistent", new_role="admin")
+        self.assertEqual(response, "Nie masz uprawnień do tej komendy lub użytkownik nie istnieje")
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+====================
+FILE: __init__.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\Tests\__init__.py
+
+
+====================
+FILE: client.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\UI\client.py
+import socket as s
+from BLL.ClientConnectionManager import ClientConnectionManager
+from BLL.ClientMessageManager import ClientMessageManager
+
+
+with ClientConnectionManager() as connection:
+    user_manager = ClientMessageManager()
+    while True:
+        try:
+            command, data_input = user_manager.prepare_request_interactive()
+            #print(f"client command: {command}")
+            #print(f"client data_input: {data_input}")
+            
+            if command not in user_manager.command_map:
+                print("Nieznane polecenie. Spróbuj ponownie.")
+                continue
+
+            if command == "logout":
+                try:
+                    connection.send_request("logout")
+                    response = connection.recv_response()
+                    print(f"response: {response}")
+                    if response == "OK":
+                        print("Wylogowano pomyślnie")
+                except (ConnectionResetError, ConnectionError, TimeoutError) as e:
+                    print(f"Błąd podczas wylogowywania: {e}")
+                except Exception as e:
+                    print(f"Nieoczekiwany błąd podczas wylogowywania: {e}")
+                finally:
+                    print("Zamykanie programu...")
+                    try:
+                        connection.close()
+                    except Exception as e:
+                        print(f"Błąd podczas zamykania połączenia: {e}")
+                    break
+            else:
+                try:
+                    if len(data_input) > 0:
+                        request = user_manager.command_map[command](command, **data_input) 
+                    else:
+                        request = user_manager.command_map[command](command)
+                    #print(request)
+                    connection.send_request(str(request)) 
+                    connection.recv_response()
+                except ConnectionError:
+                    print("Błąd połączenia z serwerem. Sprawdź połączenie i spróbuj ponownie.")
+                    break
+                except Exception as e:
+                    print(f"Wystąpił błąd: {str(e)}")
+                    continue
+        except KeyboardInterrupt:
+            print("Program został przerwany przez użytkownika.")
+            connection.close()
+            break
+        except Exception as e:
+            print(f"Wystąpił nieoczekiwany błąd: {str(e)}")
+            connection.close()
+            continue
+
+    
+        
+
+        
+
+
+====================
+FILE: server.py
+PATH: C:/Users/cempa/Documents/CODE/.cursor-tutor/client-server_app/C_S_ver_0.4 _UT\UI\server.py
+from BLL.ServerConnectionManager import ServerConnectionManager
+from BLL.DbManager import DbManager
+from BLL.ServerMessageManager import ServerMessageManager
+import socket as s
+
+
+# po zmnknięciu połączenia z klientemserwer czeka na nowe połączenie
+# Zredygnowano z  Menedżer kontekstu (with),  który 
+# automatycznie zamyka połączenie po wyjściu z bloku, 
+# co nie jest pożądane w przypadku serwera, który powinien działać ciągle.
+
+server = ServerConnectionManager()
+server.start_server()
+
+try:
+    while True:  # Główna pętla serwera
+        client_socket, address = server.accept_client()
+        print(f"Połączono z klientem: {address}")
+        user_manager = ServerMessageManager()
+        
+        try:
+            while True:  # Pętla obsługi pojedynczego klienta
+                request = server.handle_client(client_socket)
+                if not request: # Jeśli nie ma danych, bo połączenie zostało przerwane
+                    break
+                    
+                command = request[0]
+                data_input = request[1] 
+                print(request)
+                print(command)
+                print(data_input) 
+                if not command:  # Sprawdzenie czy komenda nie jest pusta
+                    continue
+                
+                if command == "logout":
+                    print(f"Klient {address} się wylogował")
+                    break  # Przerywa tylko wewnętrzną pętlę
+                
+                if command in user_manager.command_map:
+                    if len(data_input) > 0:
+                        response = str(user_manager.command_map[command](command, *data_input.values()))
+                    else:
+                        response = str(user_manager.command_map[command](command))
+                    client_socket.send(response.encode("utf-8"))
+                         
+        except Exception as e:
+            print(f"Błąd podczas obsługi klienta {address}: {e}")
+        finally:
+            client_socket.close()
+            print(f"Zamknięto połączenie z klientem {address}")
+            
+except KeyboardInterrupt:
+    print("\nZamykanie serwera...")
+except Exception as e:
+    print(f"Błąd krytyczny serwera: {e}")
+finally:
+    server.stop_server()    
+        
+

@@ -1,0 +1,142 @@
+{
+    "messages": [
+        {
+            "id": 1736883811811719,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hej",
+            "send_time": "2025-01-16T20:43:31.811719",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1736883811811720,
+            "username": "magda",
+            "sender": "anna",
+            "text": "jak leci",
+            "send_time": "2025-01-16T20:43:31.811719",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1736883811811721,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hello",
+            "send_time": "2025-01-16T21:43:31.811719",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1736883811811722,
+            "username": "magda",
+            "sender": "anna",
+            "text": "pomidor",
+            "send_time": "2025-01-16 T 20:45",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1736883811811723,
+            "username": "magda",
+            "sender": "anna",
+            "text": "wiosna",
+            "send_time": "2025-01-16 T 20:43",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1736883811811724,
+            "username": "magda",
+            "sender": "anna",
+            "text": "hej",
+            "send_time": "2025-01-16 T 20:43",
+            "is_read": 0,
+            "read_time": [
+                "2025-01-26 godz. 20:51"
+            ]
+        },
+        {
+            "id": 1737921175962,
+            "username": "magda",
+            "sender": "anna",
+            "text": "czeÄąâ€şĂ„â€ˇ czoÄąâ€šem kluski z rosoÄąâ€šem",
+            "send_time": "2025-01-26 godz. 20:52",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1737925704111,
+            "username": "iza",
+            "sender": "anna",
+            "text": "test",
+            "send_time": "2025-01-26 godz. 22:08",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1737925704115,
+            "username": "anna",
+            "sender": "iza",
+            "text": "test",
+            "send_time": "2025-01-26 godz. 22:08",
+            "read_time": "2025-01-26 godz. 22:52",
+            "is_read": 1
+        },
+        {
+            "id": 1744554841942,
+            "username": "anna",
+            "sender": "magda",
+            "text": "czzc\"\"ghgh' '",
+            "send_time": "2025-04-13 godz. 16:34",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1744554942531,
+            "username": "anna",
+            "sender": "magda",
+            "text": "gfggd\" \";",
+            "send_time": "2025-04-13 godz. 16:35",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1744555246262,
+            "username": "anna",
+            "sender": "magda",
+            "text": "'''trtyt\"hg;;;",
+            "send_time": "2025-04-13 godz. 16:40",
+            "read_time": null,
+            "is_read": 0
+        },
+        {
+            "id": 1751110779037,
+            "username": "mm",
+            "sender": "mm",
+            "text": "test 1221212",
+            "send_time": "2025-06-28 godz. 13:39",
+            "read_time": "2025-06-28 godz. 13:39",
+            "is_read": 1
+        },
+        {
+            "id": 1754778437827,
+            "username": "mmmm",
+            "sender": "mmmm",
+            "text": "czesc test",
+            "send_time": "2025-08-10 godz. 00:27",
+            "read_time": null,
+            "is_read": 0
+        }
+    ]
+}

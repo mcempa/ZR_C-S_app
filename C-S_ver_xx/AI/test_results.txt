@@ -1,0 +1,990 @@
+test_command_map_completeness (test_base_message_manager.TestBaseMessageManager.test_command_map_completeness)
+Test czy command_map zawiera wszystkie oczekiwane komendy ... ok
+test_command_map_immutability_during_runtime (test_base_message_manager.TestBaseMessageManager.test_command_map_immutability_during_runtime)
+Test czy command_map nie zmienia siê podczas wykonywania ... ok
+test_constructor_initializes_command_map (test_base_message_manager.TestBaseMessageManager.test_constructor_initializes_command_map)
+Test czy konstruktor inicjalizuje command_map ... ok
+test_process_command_all_known_commands (test_base_message_manager.TestBaseMessageManager.test_process_command_all_known_commands)
+Test przetwarzania wszystkich znanych komend ... ok
+test_process_command_case_sensitivity (test_base_message_manager.TestBaseMessageManager.test_process_command_case_sensitivity)
+Test czy komendy s¹ case-sensitive ... ok
+test_process_command_empty_string (test_base_message_manager.TestBaseMessageManager.test_process_command_empty_string)
+Test przetwarzania pustej komendy ... ok
+test_process_command_known_command (test_base_message_manager.TestBaseMessageManager.test_process_command_known_command)
+Test przetwarzania znanej komendy ... ok
+test_process_command_none_command (test_base_message_manager.TestBaseMessageManager.test_process_command_none_command)
+Test przetwarzania None jako komendy ... ok
+test_process_command_unknown_command (test_base_message_manager.TestBaseMessageManager.test_process_command_unknown_command)
+Test przetwarzania nieznanej komendy ... ok
+test_process_command_with_args_and_kwargs (test_base_message_manager.TestBaseMessageManager.test_process_command_with_args_and_kwargs)
+Test przetwarzania komendy z argumentami pozycyjnymi i nazwanymi ... ok
+test_validate_string_conversion_error (test_base_message_manager.TestBaseMessageManager.test_validate_string_conversion_error)
+Test obs³ugi b³êdu konwersji na string ... ok
+test_validate_string_each_forbidden_char (test_base_message_manager.TestBaseMessageManager.test_validate_string_each_forbidden_char)
+Test walidacji dla ka¿dego zabronionego znaku osobno ... ok
+test_validate_string_empty_string (test_base_message_manager.TestBaseMessageManager.test_validate_string_empty_string)
+Test walidacji pustego stringa ... ok
+test_validate_string_mixed_content (test_base_message_manager.TestBaseMessageManager.test_validate_string_mixed_content)
+Test walidacji mieszanej zawartoœci ... ok
+test_validate_string_non_string_input (test_base_message_manager.TestBaseMessageManager.test_validate_string_non_string_input)
+Test walidacji dla nie-stringowych danych wejœciowych ... ok
+test_validate_string_none_input (test_base_message_manager.TestBaseMessageManager.test_validate_string_none_input)
+Test walidacji dla None ... ok
+test_validate_string_normal_text (test_base_message_manager.TestBaseMessageManager.test_validate_string_normal_text)
+Test walidacji normalnego tekstu ... ok
+test_validate_string_only_forbidden_chars (test_base_message_manager.TestBaseMessageManager.test_validate_string_only_forbidden_chars)
+Test walidacji tekstu sk³adaj¹cego siê tylko z zabronionych znaków ... ok
+test_validate_string_preserves_valid_special_chars (test_base_message_manager.TestBaseMessageManager.test_validate_string_preserves_valid_special_chars)
+Test czy walidacja zachowuje dozwolone znaki specjalne ... ok
+test_validate_string_with_forbidden_chars (test_base_message_manager.TestBaseMessageManager.test_validate_string_with_forbidden_chars)
+Test walidacji tekstu z zabronionymi znakami ... ok
+test_validate_string_with_whitespace (test_base_message_manager.TestBaseMessageManager.test_validate_string_with_whitespace)
+Test walidacji tekstu z bia³ymi znakami ... ok
+test_close_method (test_client_connection_manager.TestClientConnectionManager.test_close_method)
+Test metody close() ... ok
+test_close_method_no_socket (test_client_connection_manager.TestClientConnectionManager.test_close_method_no_socket)
+Test metody close() gdy nie ma socketu ... ok
+test_connection_close (test_client_connection_manager.TestClientConnectionManager.test_connection_close) ... ok
+test_connection_establishment (test_client_connection_manager.TestClientConnectionManager.test_connection_establishment) ... ok
+test_connection_refused_error (test_client_connection_manager.TestClientConnectionManager.test_connection_refused_error) ... ok
+test_connection_reset_error (test_client_connection_manager.TestClientConnectionManager.test_connection_reset_error) ... ok
+test_recv_response (test_client_connection_manager.TestClientConnectionManager.test_recv_response) ... ok
+test_recv_response_empty_response (test_client_connection_manager.TestClientConnectionManager.test_recv_response_empty_response)
+Test obs³ugi pustej odpowiedzi (serwer zamkn¹³ po³¹czenie) ... ok
+test_recv_response_unicode_decode_error (test_client_connection_manager.TestClientConnectionManager.test_recv_response_unicode_decode_error)
+Test obs³ugi b³êdu dekodowania Unicode ... ok
+test_recv_response_without_connection (test_client_connection_manager.TestClientConnectionManager.test_recv_response_without_connection)
+Test odbierania bez aktywnego po³¹czenia ... ok
+test_retry_mechanism_success_on_second_attempt (test_client_connection_manager.TestClientConnectionManager.test_retry_mechanism_success_on_second_attempt)
+Test mechanizmu retry - sukces przy drugiej próbie ... ok
+test_send_request (test_client_connection_manager.TestClientConnectionManager.test_send_request) ... ok
+test_send_request_max_size_validation (test_client_connection_manager.TestClientConnectionManager.test_send_request_max_size_validation)
+Test walidacji maksymalnego rozmiaru komendy ... ok
+test_send_request_network_errors (test_client_connection_manager.TestClientConnectionManager.test_send_request_network_errors)
+Test obs³ugi ró¿nych b³êdów sieciowych podczas wysy³ania ... ok
+test_send_request_validation (test_client_connection_manager.TestClientConnectionManager.test_send_request_validation)
+Test walidacji danych przed wys³aniem ... ok
+test_send_request_without_connection (test_client_connection_manager.TestClientConnectionManager.test_send_request_without_connection)
+Test wysy³ania bez aktywnego po³¹czenia ... ok
+test_timeout_handling (test_client_connection_manager.TestClientConnectionManager.test_timeout_handling)
+Test obs³ugi timeout'ów ... ok
+test_all_handler_methods_exist (test_client_message_manager.TestClientMessageManager.test_all_handler_methods_exist)
+Test czy wszystkie metody handler istniej¹ i s¹ callable ... ok
+test_command_consistency_between_map_and_handlers (test_client_message_manager.TestClientMessageManager.test_command_consistency_between_map_and_handlers)
+Test spójnoœci miêdzy command_map a rzeczywistymi handlerami ... ok
+test_constructor_initializes_properly (test_client_message_manager.TestClientMessageManager.test_constructor_initializes_properly)
+Test czy konstruktor poprawnie inicjalizuje klasê ... ok
+test_create_request_basic_functionality (test_client_message_manager.TestClientMessageManager.test_create_request_basic_functionality)
+Test podstawowej funkcjonalnoœci _create_request ... ok
+test_create_request_command_as_string (test_client_message_manager.TestClientMessageManager.test_create_request_command_as_string)
+Test czy komenda jest konwertowana na string ... ok
+test_create_request_with_empty_data (test_client_message_manager.TestClientMessageManager.test_create_request_with_empty_data)
+Test _create_request z pustymi danymi ... ok
+test_get_create_input (test_client_message_manager.TestClientMessageManager.test_get_create_input)
+Test metody _get_create_input ... ok
+test_get_edit_role_input (test_client_message_manager.TestClientMessageManager.test_get_edit_role_input)
+Test metody _get_edit_role_input ... ok
+test_get_login_input (test_client_message_manager.TestClientMessageManager.test_get_login_input)
+Test metody _get_login_input ... ok
+test_get_read_message_input (test_client_message_manager.TestClientMessageManager.test_get_read_message_input)
+Test metody _get_read_message_input ... ok
+test_get_send_message_input (test_client_message_manager.TestClientMessageManager.test_get_send_message_input)
+Test metody _get_send_message_input ... ok
+test_get_sender_input (test_client_message_manager.TestClientMessageManager.test_get_sender_input)
+Test metody _get_sender_input ... ok
+test_get_username_input (test_client_message_manager.TestClientMessageManager.test_get_username_input)
+Test metody _get_username_input ... ok
+test_handle_create_new_user (test_client_message_manager.TestClientMessageManager.test_handle_create_new_user)
+Test obs³ugi tworzenia nowego u¿ytkownika ... ok
+test_handle_create_new_user_partial_params (test_client_message_manager.TestClientMessageManager.test_handle_create_new_user_partial_params)
+Test tworzenia u¿ytkownika z brakuj¹cymi parametrami ... ok
+test_handle_delete_user (test_client_message_manager.TestClientMessageManager.test_handle_delete_user)
+Test obs³ugi usuwania u¿ytkownika ... ok
+test_handle_delete_user_no_username (test_client_message_manager.TestClientMessageManager.test_handle_delete_user_no_username)
+Test usuwania u¿ytkownika bez nazwy ... ok
+test_handle_edit_user_role (test_client_message_manager.TestClientMessageManager.test_handle_edit_user_role)
+Test obs³ugi edycji roli u¿ytkownika ... ok
+test_handle_edit_user_role_partial_params (test_client_message_manager.TestClientMessageManager.test_handle_edit_user_role_partial_params)
+Test edycji roli z brakuj¹cymi parametrami ... ok
+test_handle_get_help (test_client_message_manager.TestClientMessageManager.test_handle_get_help)
+Test obs³ugi pomocy ... ok
+test_handle_get_user_info (test_client_message_manager.TestClientMessageManager.test_handle_get_user_info)
+Test obs³ugi informacji o u¿ytkowniku ... ok
+test_handle_get_user_info_no_username (test_client_message_manager.TestClientMessageManager.test_handle_get_user_info_no_username)
+Test informacji o u¿ytkowniku bez nazwy ... ok
+test_handle_login (test_client_message_manager.TestClientMessageManager.test_handle_login)
+Test obs³ugi logowania ... ok
+test_handle_login_missing_params (test_client_message_manager.TestClientMessageManager.test_handle_login_missing_params)
+Test logowania z brakuj¹cymi parametrami ... ok
+test_handle_logout (test_client_message_manager.TestClientMessageManager.test_handle_logout)
+Test obs³ugi wylogowania ... ok
+test_handle_read_all_message_current_user (test_client_message_manager.TestClientMessageManager.test_handle_read_all_message_current_user)
+Test obs³ugi odczytu wszystkich wiadomoœci u¿ytkownika ... ok
+test_handle_read_message_current_user_from_sender (test_client_message_manager.TestClientMessageManager.test_handle_read_message_current_user_from_sender)
+Test obs³ugi odczytu wiadomoœci od konkretnego nadawcy ... ok
+test_handle_read_message_current_user_from_sender_none (test_client_message_manager.TestClientMessageManager.test_handle_read_message_current_user_from_sender_none)
+Test odczytu wiadomoœci z None jako nadawca ... ok
+test_handle_read_message_user_from_sender (test_client_message_manager.TestClientMessageManager.test_handle_read_message_user_from_sender)
+Test obs³ugi odczytu wiadomoœci konkretnego u¿ytkownika od nadawcy ... ok
+test_handle_read_message_user_from_sender_partial_params (test_client_message_manager.TestClientMessageManager.test_handle_read_message_user_from_sender_partial_params)
+Test z tylko jednym parametrem ... ok
+test_handle_read_new_message (test_client_message_manager.TestClientMessageManager.test_handle_read_new_message)
+Test obs³ugi odczytu nowych wiadomoœci ... ok
+test_handle_read_new_message_with_kwargs (test_client_message_manager.TestClientMessageManager.test_handle_read_new_message_with_kwargs)
+Test odczytu nowych wiadomoœci z argumentami kwargs ... ok
+test_handle_send_message (test_client_message_manager.TestClientMessageManager.test_handle_send_message)
+Test obs³ugi wysy³ania wiadomoœci ... ok
+test_handle_send_message_with_kwargs (test_client_message_manager.TestClientMessageManager.test_handle_send_message_with_kwargs)
+Test wysy³ania wiadomoœci z dodatkowymi argumentami kwargs ... ok
+test_handle_send_message_with_none_values (test_client_message_manager.TestClientMessageManager.test_handle_send_message_with_none_values)
+Test wysy³ania wiadomoœci z wartoœciami None ... ok
+test_handle_unknown_command (test_client_message_manager.TestClientMessageManager.test_handle_unknown_command)
+Test obs³ugi nieznanej komendy ... ok
+test_handle_unknown_command_various_inputs (test_client_message_manager.TestClientMessageManager.test_handle_unknown_command_various_inputs)
+Test nieznanej komendy z ró¿nymi wejœciami ... ok
+test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling)
+Test obs³ugi bia³ych znaków we wszystkich metodach input ... 
+  test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_login_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input ... FAIL
+  test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_create_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input ... FAIL
+  test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_send_message_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input ... FAIL
+test_prepare_request_interactive_case_insensitive (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_case_insensitive)
+Test case insensitive dla interaktywnych komend ... ok
+test_prepare_request_interactive_create (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_create)
+Test interaktywnego tworzenia u¿ytkownika ... ok
+test_prepare_request_interactive_edit (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_edit)
+Test interaktywnej edycji roli ... ok
+test_prepare_request_interactive_help (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_help)
+Test interaktywnego przygotowania ¿¹dania dla help ... ok
+test_prepare_request_interactive_info_delete (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_info_delete)
+Test interaktywnych komend info i delete ... ok
+test_prepare_request_interactive_login (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_login)
+Test interaktywnego logowania ... ok
+test_prepare_request_interactive_read_commands (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_read_commands)
+Test interaktywnych komend read ... ok
+test_prepare_request_interactive_read_o (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_read_o)
+Test interaktywnego czytania wiadomoœci innego u¿ytkownika ... ok
+test_prepare_request_interactive_read_u (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_read_u)
+Test interaktywnego czytania wiadomoœci od u¿ytkownika ... ok
+test_prepare_request_interactive_send (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_send)
+Test interaktywnego wysy³ania wiadomoœci ... ok
+test_prepare_request_interactive_unknown_command (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_unknown_command)
+Test interaktywnej obs³ugi nieznanej komendy ... ok
+test_prepare_request_interactive_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_prepare_request_interactive_whitespace_handling)
+Test obs³ugi bia³ych znaków w interaktywnych komendach ... ok
+test_process_command_integration (test_client_message_manager.TestClientMessageManager.test_process_command_integration)
+Test integracji z metod¹ process_command z klasy bazowej ... ok
+test_add_message_into_db (test_db_manager.TestDbManager.test_add_message_into_db) ... ok
+test_add_user_into_db (test_db_manager.TestDbManager.test_add_user_into_db) ... ok
+test_change_message_status_into_read (test_db_manager.TestDbManager.test_change_message_status_into_read) ... ok
+test_delete_message_from_db (test_db_manager.TestDbManager.test_delete_message_from_db) ... ok
+test_delete_user_from_db (test_db_manager.TestDbManager.test_delete_user_from_db) ... ok
+test_edit_user_role_in_db (test_db_manager.TestDbManager.test_edit_user_role_in_db) ... ok
+test_get_all_messages_user (test_db_manager.TestDbManager.test_get_all_messages_user) ... ok
+test_get_all_messages_user_from_sender (test_db_manager.TestDbManager.test_get_all_messages_user_from_sender) ... ok
+test_get_all_new_messages_user (test_db_manager.TestDbManager.test_get_all_new_messages_user) ... ok
+test_get_user_info (test_db_manager.TestDbManager.test_get_user_info) ... ok
+test_get_user_password (test_db_manager.TestDbManager.test_get_user_password) ... ok
+test_get_user_role (test_db_manager.TestDbManager.test_get_user_role) ... ok
+test_is_message_in_db (test_db_manager.TestDbManager.test_is_message_in_db) ... ok
+test_is_user_in_db (test_db_manager.TestDbManager.test_is_user_in_db) ... ok
+test_is_user_password_in_db (test_db_manager.TestDbManager.test_is_user_password_in_db) ... ok
+test_delete_existing_item (test_json_repository.TestJsonRepository.test_delete_existing_item)
+Test usuwania istniej¹cego elementu ... ok
+test_delete_non_existing_item (test_json_repository.TestJsonRepository.test_delete_non_existing_item)
+Test usuwania nieistniej¹cego elementu ... ok
+test_empty_collection_operations (test_json_repository.TestJsonRepository.test_empty_collection_operations)
+Test operacji na pustej kolekcji ... ok
+test_find_all (test_json_repository.TestJsonRepository.test_find_all)
+Test pobierania wszystkich elementów ... ok
+test_find_by_field_existing (test_json_repository.TestJsonRepository.test_find_by_field_existing)
+Test znajdowania elementów po wartoœci pola ... ok
+test_find_by_field_multiple_results (test_json_repository.TestJsonRepository.test_find_by_field_multiple_results)
+Test znajdowania wielu elementów po wartoœci pola ... ok
+test_find_by_field_non_existing (test_json_repository.TestJsonRepository.test_find_by_field_non_existing)
+Test znajdowania elementów po nieistniej¹cej wartoœci pola ... ok
+test_find_by_id_existing (test_json_repository.TestJsonRepository.test_find_by_id_existing)
+Test znajdowania istniej¹cego elementu po ID ... ok
+test_find_by_id_non_existing (test_json_repository.TestJsonRepository.test_find_by_id_non_existing)
+Test znajdowania nieistniej¹cego elementu po ID ... ok
+test_load_data_from_non_existing_file (test_json_repository.TestJsonRepository.test_load_data_from_non_existing_file)
+Test wczytywania danych z nieistniej¹cego pliku ... ok
+test_save_and_load_data_consistency (test_json_repository.TestJsonRepository.test_save_and_load_data_consistency)
+Test spójnoœci danych po zapisie i odczycie ... ok
+test_save_data_creates_valid_json (test_json_repository.TestJsonRepository.test_save_data_creates_valid_json)
+Test czy _save_data tworzy prawid³owy plik JSON ... ok
+test_save_new_item (test_json_repository.TestJsonRepository.test_save_new_item)
+Test zapisywania nowego elementu ... ok
+test_update_existing_item (test_json_repository.TestJsonRepository.test_update_existing_item)
+Test aktualizacji istniej¹cego elementu ... ok
+test_update_non_existing_item (test_json_repository.TestJsonRepository.test_update_non_existing_item)
+Test aktualizacji nieistniej¹cego elementu ... ok
+test_message (unittest.loader._FailedTest.test_message) ... ERROR
+test_accept_client_error (test_server_connaction_manager.TestServerConnectionManager.test_accept_client_error)
+Test obs³ugi b³êdu podczas akceptowania klienta ... FAIL
+test_accept_client_success (test_server_connaction_manager.TestServerConnectionManager.test_accept_client_success)
+Test poprawnego akceptowania klienta ... ok
+test_handle_client_decode_error (test_server_connaction_manager.TestServerConnectionManager.test_handle_client_decode_error)
+Test obs³ugi b³êdu dekodowania danych ... ok
+test_handle_client_parse_error (test_server_connaction_manager.TestServerConnectionManager.test_handle_client_parse_error)
+Test obs³ugi b³êdu parsowania danych ... ok
+test_handle_client_socket_error (test_server_connaction_manager.TestServerConnectionManager.test_handle_client_socket_error)
+Test obs³ugi b³êdu po³¹czenia ... ok
+test_handle_client_success (test_server_connaction_manager.TestServerConnectionManager.test_handle_client_success)
+Test poprawnego obs³ugiwania danych od klienta ... ERROR
+test_init (test_server_connaction_manager.TestServerConnectionManager.test_init)
+Test inicjalizacji ServerConnectionManager ... ok
+test_start_server_error (test_server_connaction_manager.TestServerConnectionManager.test_start_server_error)
+Test obs³ugi b³êdu podczas uruchamiania serwera ... FAIL
+test_start_server_success (test_server_connaction_manager.TestServerConnectionManager.test_start_server_success)
+Test poprawnego uruchomienia serwera ... ok
+test_stop_server (test_server_connaction_manager.TestServerConnectionManager.test_stop_server)
+Test zatrzymania serwera ... ok
+test_full_communication (test_server_connaction_manager.TestServerConnectionManagerIntegration.test_full_communication)
+Test pe³nej komunikacji miêdzy serwerem a klientem ... ERROR
+test_multiple_clients (test_server_connaction_manager.TestServerConnectionManagerIntegration.test_multiple_clients)
+Test obs³ugi wielu klientów ... ERROR
+test_client_main_loop_structure (test_ui_client.TestClientUI.test_client_main_loop_structure)
+Test struktury g³ównej pêtli klienta ... ok
+test_client_request_processing_logic (test_ui_client.TestClientUI.test_client_request_processing_logic)
+Test logiki przetwarzania ¿¹dañ klienta ... ok
+test_connection_close_error_handling (test_ui_client.TestClientUI.test_connection_close_error_handling)
+Test obs³ugi b³êdów podczas zamykania po³¹czenia ... ok
+test_connection_error_handling (test_ui_client.TestClientUI.test_connection_error_handling)
+Test obs³ugi b³êdu po³¹czenia ... ERROR
+test_empty_data_input_handling (test_ui_client.TestClientUI.test_empty_data_input_handling)
+Test obs³ugi pustych danych wejœciowych ... C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:925: ResourceWarning: unclosed <socket.socket fd=608, family=2, type=1, proto=0, laddr=('127.0.0.1', 64623), raddr=('127.0.0.1', 53868)>
+  def assert_called_with(self, /, *args, **kwargs):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:925: ResourceWarning: unclosed <socket.socket fd=628, family=2, type=1, proto=0, laddr=('127.0.0.1', 64623), raddr=('127.0.0.1', 53869)>
+  def assert_called_with(self, /, *args, **kwargs):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_general_exception_handling (test_ui_client.TestClientUI.test_general_exception_handling)
+Test obs³ugi ogólnych wyj¹tków ... ERROR
+test_keyboard_interrupt_handling (test_ui_client.TestClientUI.test_keyboard_interrupt_handling)
+Test obs³ugi przerwania przez u¿ytkownika (Ctrl+C) ... ERROR
+test_logout_error_scenarios (test_ui_client.TestClientUI.test_logout_error_scenarios)
+Test ró¿nych scenariuszy b³êdów podczas wylogowania ... ok
+test_request_format_validation (test_ui_client.TestClientUI.test_request_format_validation)
+Test walidacji formatu ¿¹dania ... ok
+test_successful_logout_flow (test_ui_client.TestClientUI.test_successful_logout_flow)
+Test pomyœlnego wylogowania u¿ytkownika ... ERROR
+test_unknown_command_handling (test_ui_client.TestClientUI.test_unknown_command_handling)
+Test obs³ugi nieznanej komendy ... ERROR
+test_client_exception_handling (test_ui_server.TestServerUI.test_client_exception_handling)
+Test obs³ugi wyj¹tków podczas obs³ugi klienta ... ERROR
+test_command_data_extraction (test_ui_server.TestServerUI.test_command_data_extraction)
+Test ekstraktowania danych z komend ... ok
+test_command_processing_with_data (test_ui_server.TestServerUI.test_command_processing_with_data)
+Test przetwarzania komendy z danymi ... ERROR
+test_command_processing_without_data (test_ui_server.TestServerUI.test_command_processing_without_data)
+Test przetwarzania komendy bez danych ... ok
+test_critical_server_error_handling (test_ui_server.TestServerUI.test_critical_server_error_handling)
+Test obs³ugi krytycznych b³êdów serwera ... FAIL
+test_empty_command_handling (test_ui_server.TestServerUI.test_empty_command_handling)
+Test obs³ugi pustej komendy ... ok
+test_empty_request_handling (test_ui_server.TestServerUI.test_empty_request_handling)
+Test obs³ugi pustego ¿¹dania ... ok
+test_keyboard_interrupt_handling (test_ui_server.TestServerUI.test_keyboard_interrupt_handling)
+Test obs³ugi przerwania przez u¿ytkownika (Ctrl+C) ... ERROR
+test_logout_command_handling (test_ui_server.TestServerUI.test_logout_command_handling)
+Test obs³ugi komendy logout ... ERROR
+test_multiple_client_handling_simulation (test_ui_server.TestServerUI.test_multiple_client_handling_simulation)
+Test symulacji obs³ugi wielu klientów ... ok
+test_request_parsing_logic (test_ui_server.TestServerUI.test_request_parsing_logic)
+Test logiki parsowania ¿¹dañ ... ok
+test_response_encoding_and_sending (test_ui_server.TestServerUI.test_response_encoding_and_sending)
+Test kodowania i wysy³ania odpowiedzi ... ok
+test_server_debug_output (test_ui_server.TestServerUI.test_server_debug_output)
+Test wyjœcia debugowego serwera ... ok
+test_server_main_loop_structure (test_ui_server.TestServerUI.test_server_main_loop_structure)
+Test struktury g³ównej pêtli serwera ... ok
+test_server_startup_and_client_connection (test_ui_server.TestServerUI.test_server_startup_and_client_connection)
+Test uruchamiania serwera i przyjmowania po³¹czenia klienta ... ERROR
+test_admin_role_permissions (test_user.TestUser.test_admin_role_permissions)
+Test uprawnieñ dla roli 'admin' ... ok
+test_is_user_allowed_to_command_with_different_roles (test_user.TestUser.test_is_user_allowed_to_command_with_different_roles)
+Test metody is_user_allowed_to_command dla ró¿nych ról ... ok
+test_user_attributes_assignment (test_user.TestUser.test_user_attributes_assignment)
+Test przypisywania wartoœci do atrybutów User ... ok
+test_user_boolean_operations (test_user.TestUser.test_user_boolean_operations)
+Test operacji boolean na u¿ytkowniku ... ok
+test_user_command_edge_cases (test_user.TestUser.test_user_command_edge_cases)
+Test przypadków brzegowych dla komend ... ok
+test_user_constructor_default_values (test_user.TestUser.test_user_constructor_default_values)
+Test domyœlnych wartoœci konstruktora User ... ok
+test_user_data_types (test_user.TestUser.test_user_data_types)
+Test typów danych atrybutów User ... ok
+test_user_empty_values (test_user.TestUser.test_user_empty_values)
+Test obs³ugi pustych wartoœci ... ok
+test_user_login_workflow (test_user.TestUser.test_user_login_workflow)
+Test workflow logowania u¿ytkownika ... ok
+test_user_permission_consistency (test_user.TestUser.test_user_permission_consistency)
+Test spójnoœci uprawnieñ miêdzy ró¿nymi komendami ... ok
+test_user_permission_edge_cases (test_user.TestUser.test_user_permission_edge_cases)
+Test przypadków brzegowych dla uprawnieñ ... ok
+test_user_role_change (test_user.TestUser.test_user_role_change)
+Test zmiany roli u¿ytkownika ... ok
+test_user_role_user_permissions (test_user.TestUser.test_user_role_user_permissions)
+Test uprawnieñ dla roli 'user' ... ok
+test_user_state_transitions (test_user.TestUser.test_user_state_transitions)
+Test przejœæ stanów u¿ytkownika ... ok
+test_create_new_user (test_user_message_manager.TestUserServerManager.test_create_new_user)
+Test tworzenia nowego u¿ytkownika ... C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py:1186: ResourceWarning: unclosed <socket.socket fd=624, family=2, type=1, proto=0, laddr=('127.0.0.1', 64623)>
+  def _execute_mock_call(self, /, *args, **kwargs):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_delete_user (test_user_message_manager.TestUserServerManager.test_delete_user)
+Test usuwania u¿ytkownika ... ok
+test_edit_user_role (test_user_message_manager.TestUserServerManager.test_edit_user_role)
+Test edycji roli u¿ytkownika ... FAIL
+test_get_help (test_user_message_manager.TestUserServerManager.test_get_help)
+Test wyœwietlania pomocy ... FAIL
+test_login_user (test_user_message_manager.TestUserServerManager.test_login_user)
+Test logowania u¿ytkownika ... FAIL
+test_read_new_message (test_user_message_manager.TestUserServerManager.test_read_new_message)
+Test odczytu nowych wiadomoœci ... ok
+test_send_message (test_user_message_manager.TestUserServerManager.test_send_message)
+Test wysy³ania wiadomoœci ... ok
+test_validate_string (test_user_message_manager.TestUserServerManager.test_validate_string)
+Test walidacji i sanityzacji tekstu ... ok
+
+======================================================================
+ERROR: test_message (unittest.loader._FailedTest.test_message)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_message
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 394, in _find_test_path
+    module = self._get_module_from_name(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\loader.py", line 337, in _get_module_from_name
+    __import__(name)
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_message.py", line 6, in <module>
+    from models.message import Message
+ModuleNotFoundError: No module named 'models'
+
+
+======================================================================
+ERROR: test_handle_client_success (test_server_connaction_manager.TestServerConnectionManager.test_handle_client_success)
+Test poprawnego obs³ugiwania danych od klienta
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 80, in handle_client
+    data_list = json.loads(data_string)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py", line 107, in test_handle_client_success
+    result = self.server_manager.handle_client(mock_client)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 102, in handle_client
+    raise ValueError("Nieprawid³owy format JSON")
+ValueError: Nieprawid³owy format JSON
+
+======================================================================
+ERROR: test_full_communication (test_server_connaction_manager.TestServerConnectionManagerIntegration.test_full_communication)
+Test pe³nej komunikacji miêdzy serwerem a klientem
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 80, in handle_client
+    data_list = json.loads(data_string)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py", line 173, in test_full_communication
+    received_data = self.server.handle_client(client_socket)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 102, in handle_client
+    raise ValueError("Nieprawid³owy format JSON")
+ValueError: Nieprawid³owy format JSON
+
+======================================================================
+ERROR: test_multiple_clients (test_server_connaction_manager.TestServerConnectionManagerIntegration.test_multiple_clients)
+Test obs³ugi wielu klientów
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 80, in handle_client
+    data_list = json.loads(data_string)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\json\decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py", line 194, in test_multiple_clients
+    received_data1 = self.server.handle_client(client_socket1)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 102, in handle_client
+    raise ValueError("Nieprawid³owy format JSON")
+ValueError: Nieprawid³owy format JSON
+
+======================================================================
+ERROR: test_connection_error_handling (test_ui_client.TestClientUI.test_connection_error_handling)
+Test obs³ugi b³êdu po³¹czenia
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    with self.decoration_helper(patched,
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1369, in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 526, in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1442, in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py", line 518, in resolve_name
+    mod = importlib.import_module(s)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\UI\client.py", line 6, in <module>
+    with ClientConnectionManager() as connection:
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 14, in __enter__
+    return self._connect_with_retry()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 47, in _connect_with_retry
+    raise ConnectionError(f"Po³¹czenie nieudane: {last_exception}")
+ConnectionError: Po³¹czenie nieudane: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+
+======================================================================
+ERROR: test_general_exception_handling (test_ui_client.TestClientUI.test_general_exception_handling)
+Test obs³ugi ogólnych wyj¹tków
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    with self.decoration_helper(patched,
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1369, in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 526, in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1442, in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py", line 518, in resolve_name
+    mod = importlib.import_module(s)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\UI\client.py", line 6, in <module>
+    with ClientConnectionManager() as connection:
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 14, in __enter__
+    return self._connect_with_retry()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 47, in _connect_with_retry
+    raise ConnectionError(f"Po³¹czenie nieudane: {last_exception}")
+ConnectionError: Po³¹czenie nieudane: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+
+======================================================================
+ERROR: test_keyboard_interrupt_handling (test_ui_client.TestClientUI.test_keyboard_interrupt_handling)
+Test obs³ugi przerwania przez u¿ytkownika (Ctrl+C)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    with self.decoration_helper(patched,
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1369, in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 526, in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1442, in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py", line 518, in resolve_name
+    mod = importlib.import_module(s)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\UI\client.py", line 6, in <module>
+    with ClientConnectionManager() as connection:
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 14, in __enter__
+    return self._connect_with_retry()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 47, in _connect_with_retry
+    raise ConnectionError(f"Po³¹czenie nieudane: {last_exception}")
+ConnectionError: Po³¹czenie nieudane: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+
+======================================================================
+ERROR: test_successful_logout_flow (test_ui_client.TestClientUI.test_successful_logout_flow)
+Test pomyœlnego wylogowania u¿ytkownika
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    with self.decoration_helper(patched,
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1369, in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 526, in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1442, in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py", line 518, in resolve_name
+    mod = importlib.import_module(s)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\UI\client.py", line 6, in <module>
+    with ClientConnectionManager() as connection:
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 14, in __enter__
+    return self._connect_with_retry()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 47, in _connect_with_retry
+    raise ConnectionError(f"Po³¹czenie nieudane: {last_exception}")
+ConnectionError: Po³¹czenie nieudane: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+
+======================================================================
+ERROR: test_unknown_command_handling (test_ui_client.TestClientUI.test_unknown_command_handling)
+Test obs³ugi nieznanej komendy
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1387, in patched
+    with self.decoration_helper(patched,
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1369, in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 526, in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1442, in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\pkgutil.py", line 518, in resolve_name
+    mod = importlib.import_module(s)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\UI\client.py", line 6, in <module>
+    with ClientConnectionManager() as connection:
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 14, in __enter__
+    return self._connect_with_retry()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ClientConnectionManager.py", line 47, in _connect_with_retry
+    raise ConnectionError(f"Po³¹czenie nieudane: {last_exception}")
+ConnectionError: Po³¹czenie nieudane: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+
+======================================================================
+ERROR: test_client_exception_handling (test_ui_server.TestServerUI.test_client_exception_handling)
+Test obs³ugi wyj¹tków podczas obs³ugi klienta
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 245, in test_client_exception_handling
+    exec("""
+  File "<string>", line 6, in <module>
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 48, in accept_client
+    raise ConnectionError("Serwer nie zosta³ uruchomiony")
+ConnectionError: Serwer nie zosta³ uruchomiony
+
+======================================================================
+ERROR: test_command_processing_with_data (test_ui_server.TestServerUI.test_command_processing_with_data)
+Test przetwarzania komendy z danymi
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 133, in test_command_processing_with_data
+    exec("""
+  File "<string>", line 6, in <module>
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 48, in accept_client
+    raise ConnectionError("Serwer nie zosta³ uruchomiony")
+ConnectionError: Serwer nie zosta³ uruchomiony
+
+======================================================================
+ERROR: test_keyboard_interrupt_handling (test_ui_server.TestServerUI.test_keyboard_interrupt_handling)
+Test obs³ugi przerwania przez u¿ytkownika (Ctrl+C)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 282, in test_keyboard_interrupt_handling
+    exec("""
+  File "<string>", line 8, in <module>
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 51, in accept_client
+    client_socket, address = self.server_socket.accept()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 295, in accept
+    fd, addr = self._accept()
+               ^^^^^^^^^^^^^^
+TimeoutError: timed out
+
+======================================================================
+ERROR: test_logout_command_handling (test_ui_server.TestServerUI.test_logout_command_handling)
+Test obs³ugi komendy logout
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 92, in test_logout_command_handling
+    exec("""
+  File "<string>", line 6, in <module>
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 48, in accept_client
+    raise ConnectionError("Serwer nie zosta³ uruchomiony")
+ConnectionError: Serwer nie zosta³ uruchomiony
+
+======================================================================
+ERROR: test_server_startup_and_client_connection (test_ui_server.TestServerUI.test_server_startup_and_client_connection)
+Test uruchamiania serwera i przyjmowania po³¹czenia klienta
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 44, in test_server_startup_and_client_connection
+    exec("""
+  File "<string>", line 8, in <module>
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\BLL\ServerConnectionManager.py", line 51, in accept_client
+    client_socket, address = self.server_socket.accept()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 295, in accept
+    fd, addr = self._accept()
+               ^^^^^^^^^^^^^^
+TimeoutError: timed out
+
+======================================================================
+FAIL: test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_login_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_client_message_manager.py", line 402, in test_input_methods_whitespace_handling
+    self.assertEqual(result, expected)
+AssertionError: {'username': 'user', 'password': 'pass'} != {'username': 'user', 'password': '  pass  '}
+- {'password': 'pass', 'username': 'user'}
++ {'password': '  pass  ', 'username': 'user'}
+?               ++    ++
+
+
+======================================================================
+FAIL: test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_create_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_client_message_manager.py", line 402, in test_input_methods_whitespace_handling
+    self.assertEqual(result, expected)
+AssertionError: {'username': 'user', 'password': 'pass'} != {'username': 'user', 'password': '  pass  '}
+- {'password': 'pass', 'username': 'user'}
++ {'password': '  pass  ', 'username': 'user'}
+?               ++    ++
+
+
+======================================================================
+FAIL: test_input_methods_whitespace_handling (test_client_message_manager.TestClientMessageManager.test_input_methods_whitespace_handling) (method='_get_send_message_input')
+Test obs³ugi bia³ych znaków we wszystkich metodach input
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_client_message_manager.py", line 402, in test_input_methods_whitespace_handling
+    self.assertEqual(result, expected)
+AssertionError: {'receiver': 'receiver', 'text': 'message'} != {'receiver': 'receiver', 'text': '  message  '}
+- {'receiver': 'receiver', 'text': 'message'}
++ {'receiver': 'receiver', 'text': '  message  '}
+?                                   ++       ++
+
+
+======================================================================
+FAIL: test_accept_client_error (test_server_connaction_manager.TestServerConnectionManager.test_accept_client_error)
+Test obs³ugi b³êdu podczas akceptowania klienta
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py", line 97, in test_accept_client_error
+    self.assertEqual(str(context.exception), "Accept error")
+AssertionError: 'B³¹d akceptowania: Accept error' != 'Accept error'
+- B³¹d akceptowania: Accept error
++ Accept error
+
+
+======================================================================
+FAIL: test_start_server_error (test_server_connaction_manager.TestServerConnectionManager.test_start_server_error)
+Test obs³ugi b³êdu podczas uruchamiania serwera
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_server_connaction_manager.py", line 56, in test_start_server_error
+    self.assertEqual(str(context.exception), "Test error")
+AssertionError: 'Nie mo¿na uruchomiæ serwera: Test error' != 'Test error'
+- Nie mo¿na uruchomiæ serwera: Test error
++ Test error
+
+
+======================================================================
+FAIL: test_critical_server_error_handling (test_ui_server.TestServerUI.test_critical_server_error_handling)
+Test obs³ugi krytycznych b³êdów serwera
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\AppData\Local\Programs\Python\Python312\Lib\unittest\mock.py", line 1390, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_ui_server.py", line 329, in test_critical_server_error_handling
+    self.assertIn("B³¹d krytyczny serwera: Critical server error", captured)
+AssertionError: 'B³¹d krytyczny serwera: Critical server error' not found in 'Serwer nas³uchuje na 127.0.0.1:64623\nB³¹d krytyczny serwera: timed out\nSerwer zosta³ zamkniêty.\n'
+
+======================================================================
+FAIL: test_edit_user_role (test_user_message_manager.TestUserServerManager.test_edit_user_role)
+Test edycji roli u¿ytkownika
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_user_message_manager.py", line 142, in test_edit_user_role
+    self.assertEqual(response, "Rola zostala zmieniona")
+AssertionError: 'Rola zosta³a zmieniona' != 'Rola zostala zmieniona'
+- Rola zosta³a zmieniona
+?           ^
++ Rola zostala zmieniona
+?           ^
+
+
+======================================================================
+FAIL: test_get_help (test_user_message_manager.TestUserServerManager.test_get_help)
+Test wyœwietlania pomocy
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_user_message_manager.py", line 41, in test_get_help
+    self.assertEqual(response, "Nie masz uprawnieñ do tej komendy")
+AssertionError: 'send: send - wysy³anie wiadomoœci do inne[655 chars]min)' != 'Nie masz uprawnieñ do tej komendy'
+Diff is 751 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_login_user (test_user_message_manager.TestUserServerManager.test_login_user)
+Test logowania u¿ytkownika
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C_S_ver_0.4 _UT\Tests\test_user_message_manager.py", line 78, in test_login_user
+    self.assertEqual(response, "Nieprawid³owa nazwa u¿ytkownika lub has³o")
+AssertionError: 'Nie masz uprawnieñ do tej komendy lub jesteœ ju¿ zalogowany' != 'Nieprawid³owa nazwa u¿ytkownika lub has³o'
+- Nie masz uprawnieñ do tej komendy lub jesteœ ju¿ zalogowany
++ Nieprawid³owa nazwa u¿ytkownika lub has³o
+
+
+----------------------------------------------------------------------
+Ran 180 tests in 66.823s
+
+FAILED (failures=9, errors=14)
+Po³¹czenie zosta³o zamkniête
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Próba 1 nieudana: Connection refused
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: Connection refused
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: Connection refused
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie zosta³o przerwane przez serwer: Connection reset
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+test response
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+B³¹d socketu podczas odbierania: Serwer zamkn¹³ po³¹czenie
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+B³¹d dekodowania odpowiedzi: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Próba 1 nieudana: First attempt failed
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Nieoczekiwany b³¹d podczas wysy³ania: Komenda przekracza maksymalny rozmiar 2048
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie zosta³o przerwane: Reset
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie zosta³o przerwane: Aborted
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Po³¹czenie zosta³o przerwane: Broken pipe
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Nieoczekiwany b³¹d podczas wysy³ania: Komenda nie mo¿e byæ pusta
+Nieoczekiwany b³¹d podczas wysy³ania: Komenda nie mo¿e byæ pusta
+Po³¹czenie z serwerem zostaje zamkniete
+Próba po³¹czenia 1/3
+Po³¹czenie nawi¹zane pomyœlnie
+Przekroczono limit czasu podczas wysy³ania: Send timeout
+Po³¹czenie z serwerem zostaje zamkniete
+U¿ytkownik test_user zosta³ pomyœlnie usuniêty
+Zmieniono rolê u¿ytkownika test_user na admin
+Zmieniono rolê u¿ytkownika test_user na admin
+B³¹d socketu podczas akceptowania po³¹czenia: Accept error
+Serwer zosta³ zamkniêty.
+Serwer zosta³ zamkniêty.
+B³¹d dekodowania danych: 'utf-8' codec can't decode byte 0x69 in position 0: Invalid UTF-8
+B³¹d podczas parsowania JSON: Expecting value: line 1 column 1 (char 0)
+B³¹d po³¹czenia: Connection error
+B³¹d podczas parsowania JSON: Expecting value: line 1 column 2 (char 1)
+B³¹d systemu operacyjnego: Test error
+Serwer zosta³ zamkniêty.
+Serwer nas³uchuje na 127.0.0.1:64623
+Serwer zosta³ zamkniêty.
+Serwer zosta³ zamkniêty.
+Serwer zosta³ zamkniêty.
+Serwer nas³uchuje na 127.0.0.1:64623
+B³¹d podczas parsowania JSON: Expecting value: line 1 column 2 (char 1)
+Serwer zosta³ zamkniêty.
+Serwer nas³uchuje na 127.0.0.1:64623
+B³¹d podczas parsowania JSON: Expecting value: line 1 column 2 (char 1)
+Serwer zosta³ zamkniêty.
+Próba po³¹czenia 1/3
+Próba 1 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Próba po³¹czenia 1/3
+Próba 1 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Próba po³¹czenia 1/3
+Próba 1 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Próba po³¹czenia 1/3
+Próba 1 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Próba po³¹czenia 1/3
+Próba 1 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 2/3
+Próba 2 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Oczekiwanie 1.0s przed kolejn¹ prób¹...
+Próba po³¹czenia 3/3
+Próba 3 nieudana: [WinError 10061] Nie mo¿na nawi¹zaæ po³¹czenia, poniewa¿ komputer docelowy aktywnie go odmawia
+Nie uda³o siê nawi¹zaæ po³¹czenia po 3 próbach
+Serwer nas³uchuje na 127.0.0.1:64623
+B³¹d krytyczny serwera: timed out
+Serwer zosta³ zamkniêty.

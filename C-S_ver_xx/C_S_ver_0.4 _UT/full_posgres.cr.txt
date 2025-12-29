@@ -1,0 +1,1567 @@
+
+
+# --- .\auth.py ---
+import uuid
+from database import Database
+from utils import hash_password, check_password
+
+class Auth():
+    def __init__(self, database):
+        self.db = database
+        self.users = self.db.get_users()
+
+    def get_user_info(self, login):
+        for user in self.users:
+            if user["username"] == login:
+                return user
+
+    def register_user(self, login, password):
+        if any(user["username"] == login for user in self.users):
+            print("User already exists.")
+            return False
+        
+        if (not login or not password):
+            print("Login or password are empty string.")
+            return False
+
+        new_user = self.create_user(login, password)
+        self.users.append(new_user)
+        self.db.set_users(self.users)
+
+        print(f"User registered: {login}")
+        return True
+
+    def login_user(self, login, password):
+        for user in self.users:
+            if user["username"] == login:
+                if check_password(password, user["password"]):
+                    print("Login successful")
+                    return True
+                else:
+                    print("Wrong password.")
+                    return False
+
+        print("User doesn't exists.")
+        return False
+
+    def create_user(self, username, password):
+        new_user= {
+            "id": str(uuid.uuid4()),
+            "username": username,
+            "password": hash_password(password),
+            "messages": [],
+            "role": "user"
+        }
+
+        return new_user
+    
+    def delete_user(self, username):
+        self.users = [user for user in self.users if user["username"] != username]
+        self.db.set_users(self.users)
+
+    def edit_user(self, username, parameter, new_value):
+        for user in self.users:
+            if user["username"] == username:
+                if parameter == "password":
+                    user[parameter] = hash_password(new_value)
+                else:
+                    user[parameter] = new_value
+                break
+        self.db.set_users(self.users)
+        self.refresh_users()
+
+    def refresh_users(self):
+        self.users = self.db.get_users()
+
+
+# --- .\client.py ---
+import socket
+import json
+from client_handlers import command_handlers
+import getpass
+
+class Client():
+    def __init__(self, host_ip = "127.0.0.1", host_port = 65432, encoder = "utf-8", bytesize = 1024):
+        self.host = host_ip
+        self.port = host_port
+        self.address = (host_ip, host_port)
+        self.encoder = encoder
+        self.bytesize = bytesize
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.command_map = {
+            "login": self._login_register,
+            "register": self._login_register,
+            "user-info": self._user_info,
+            "user-edit": self._user_edit,
+            "send-msg": self._send_msg,
+            "read-msg": self._read_msg,
+            "read-user-msg": self._read_user_msg,
+            "inbox-all": self._inbox_all,
+            "delete-msg": self._delete_msg,
+            "delete-user-msg": self._delete_user_msg,
+        }
+        self.simple_commands = {"help", "uptime", "info", "stop", "logout", "inbox"}
+        
+    def connect(self):
+        try:
+            self.client_socket.connect(self.address)
+            greeting = self.client_socket.recv(self.bytesize).decode(self.encoder)
+            print(greeting)
+
+            while True:
+                try:
+                    command = input("\nSend message (type 'help' to get help): ").strip().lower()
+                    print("")
+                    request = self.build_request(command)
+                    if request is None:
+                        continue
+
+                    self.client_socket.send(json.dumps(request).encode(self.encoder))
+                    
+                    should_stop = self.get_response(request["cmd"], self.client_socket)
+
+                    if should_stop:
+                        break
+
+                except KeyboardInterrupt:
+                    self.client_socket.send(json.dumps({"cmd": "stop"}).encode(self.encoder))
+                    print("\nAborted by user (Ctrl+C). Closing client.")
+                    break
+
+        except ConnectionRefusedError:
+            print("Could not connect to server. Make sure the server is running.")
+        except Exception as e:
+            print(f"An error occurred while connecting: {e}")
+        finally:
+            self.client_socket.close()
+
+    def build_request(self, command):
+        if command in self.simple_commands:
+            return {"cmd": command}
+        elif command in self.command_map:
+            return self.command_map[command](command)
+        else:
+            print("Unknown command.")
+            return None
+
+    def get_response(self, command, sock):
+
+        try:
+            response = sock.recv(self.bytesize).decode(self.encoder)
+            data = json.loads(response)
+        except json.JSONDecodeError:
+            print("Error decoding JSON response.")
+            return False
+
+        if data == False:
+            print("You must be logged in to use this command.")
+        else:
+            handler = command_handlers.get(command)
+            if handler is None:
+                return False
+            result = handler(data)
+            return result if isinstance(result, bool) else False
+        
+    # === POMOCNICZE FUNKCJE ===
+
+    def _login_register(self, command):
+        username = input("Username: ").strip()
+        password = getpass.getpass("Password: ").strip()
+        return {"cmd": command, "username": username, "password": password}
+
+    def _user_info(self, command):
+        username = input("Username: ").strip()
+        return {"cmd": command, "username": username}
+
+    def _user_edit(self, command):
+        username = input("Username: ").strip()
+        parameter = input("Parameter to edit: ").strip()
+        if parameter == "password":
+            new_value = getpass.getpass("New password: ")
+        else:
+            new_value = input("New value: ")
+        return {"cmd": command, "username": username, "parameter": parameter, "new_value": new_value}
+
+    def _send_msg(self, command):
+        recipient = input("Enter recipient's nickname: ").strip()
+        message = input("Enter message (up to 255 characters): ")
+        return {"cmd": command, "recipient": recipient, "message": message}
+
+    def _read_msg(self, command):
+        while True:
+            msg_num = input("Which message do you want to read? ").strip()
+            if msg_num.isdigit() and int(msg_num) > 0:
+                break
+            else:
+                print("Please enter a valid positive integer.")
+        return {"cmd": command, "msg_num": msg_num}
+
+    def _read_user_msg(self, command):
+        username = input("Whose inbox do you want to read? ").strip()
+        while True:
+            msg_num = input("Which message do you want to read? ").strip()
+            if msg_num.isdigit() and int(msg_num) > 0:
+                break
+            else:
+                print("Please enter a valid positive integer for message number.")
+        return {"cmd": command, "msg_num": msg_num, "username": username}
+
+    def _inbox_all(self, command):
+        username = input("Username: ").strip()
+        return {"cmd": command, "username": username}
+
+    def _delete_msg(self, command):
+        while True:
+            msg_num = input("Which message do you want to delete? ").strip()
+            if msg_num.isdigit() and int(msg_num) > 0:
+                break
+            else:
+                print("Please enter a valid positive integer for message number.")
+        return {"cmd": command, "msg_num": msg_num}
+
+    def _delete_user_msg(self, command):
+        username = input("Whose message do you want to delete? ").strip()
+        while True:
+            msg_num = input("Which message do you want to delete? ").strip()
+            if msg_num.isdigit() and int(msg_num) > 0:
+                break
+            else:
+                print("Please enter a valid positive integer for message number.")
+        return {"cmd": command, "msg_num": msg_num, "username": username}
+    
+
+
+if __name__ == "__main__":
+    client = Client()
+    client.connect()
+
+# --- .\client_handlers.py ---
+def handle_help(data):
+    print("Available commands:")
+    for command, description in data.items():
+        print(f"  - {command}: {description}")
+
+def handle_info(data):
+    print(f"Server created: {data['created_at']}")
+    print(f"Server's version: {data['version']}")
+
+def handle_uptime(data):
+    print(f"Server uptime: {data}")
+
+def handle_register(data):
+    print(data)
+
+def handle_login(data):
+    print(data)
+
+def handle_logout(data):
+    print(data)
+
+def handle_stop(_):
+    print("The connection to the server was terminated.")
+    return True
+
+def handle_user_info(data):
+    if isinstance(data, str):
+        print(data)
+        return
+    
+    print(f"ID: {data["id"]}")
+    print(f"Username: {data["username"]}")
+    print(f"Password: {data["password"]}")
+    print(f"Numbers of messages: {len(data["messages"])}")
+    print(f"Role: {data["role"]}")
+
+def handle_user_edit(data):
+    print(data)
+
+def handle_user_delete(data):
+    print(data)
+
+def handle_send_message(data):
+    print(data)
+
+def handle_read_messages(data):
+    if isinstance(data, str):
+        print(data)
+        return
+
+    for i, msg in enumerate(data):
+        print(f"[{i + 1}] Sender: {msg['sender']}; Read: {msg['was_read']}")
+
+def handle_read_message(data):
+    if isinstance(data, str):
+        print(data)
+        return
+
+    print(f"Sender: {data["sender"]}")
+    print(f"Send At: {data["sent_at"]}")
+    print(f"Message: {data["message"]}")
+
+def handle_delete_msg(data):
+    print(data)
+
+# def handle_unknown(data):
+#     print(data)
+
+command_handlers = {
+    "uptime": handle_uptime,
+    "info": handle_info,
+    "help": handle_help,
+    "stop": handle_stop,
+    "register": handle_register,
+    "login": handle_login,
+    "logout": handle_logout,
+    "user-info": handle_user_info,
+    "user-edit" : handle_user_edit,
+    "user-delete": handle_user_delete,
+    "send-msg": handle_send_message,
+    "inbox": handle_read_messages,
+    "inbox-all": handle_read_messages,
+    "read-msg": handle_read_message,
+    "read-user-msg": handle_read_message,
+    "delete-msg": handle_delete_msg,
+    "delete-user-msg": handle_delete_msg
+    # "unknown": handle_unknown
+}
+
+# --- .\database.py ---
+import json
+
+ENCODER = "utf-8"
+
+class Database():
+    def __init__(self, db_file="db.json"):
+        self.db_file = db_file
+        self.data = self.load()
+
+    def load(self):
+        with open(self.db_file, "r", encoding=ENCODER) as file:
+            return json.load(file)
+
+    def save(self):
+        with open(self.db_file, "w", encoding=ENCODER) as file:
+            json.dump(self.data, file, indent=4)
+
+    def update(self):
+        self.data = self.load()
+            
+    def get_users(self):
+        return self.data.get("users", [])
+
+    def set_users(self, users):
+        self.data["users"] = users
+        self.save()
+
+    def get_user_messages(self, username):
+        self.update()
+        users = self.get_users()
+        for user in users:
+            if user["username"] == username:
+                return user["messages"]
+            
+    def set_user_messages(self, username, messages):
+        users = self.get_users()
+        for user in users:
+            if user["username"] == username:
+                user["messages"] = messages
+        self.save()
+            
+    def add_user_message(self, username, message):
+        self.update()
+        messages = self.get_user_messages(username)
+        messages.append(message)
+        self.set_user_messages(username, messages)
+
+    def read_message(self, username, num):
+        self.update()
+        messages = self.get_user_messages(username)
+        messages[num]["was_read"] = True
+        self.set_user_messages(username, messages)
+
+    def delete_message(self, username, num):
+        self.update()
+        messages = self.get_user_messages(username)
+        messages = [msg for i, msg in enumerate(messages) if i != num]
+        self.set_user_messages(username, messages)
+
+    def clear_read_messages(self, username):
+        self.update()
+        messages = self.get_user_messages(username)
+        messages = [msg for msg in messages if msg["was_read"] != True]
+        self.set_user_messages(username, messages)
+
+# --- .\server.py ---
+import socket
+import json
+import time
+from auth import Auth
+from database import Database
+from server_handlers import command_handlers, handle_unknown
+
+
+class Server():
+    def __init__(self, host_ip = "127.0.0.1", host_port = 65432, encoder = "utf-8", bytesize = 1024):
+        self.host = host_ip
+        self.port = host_port
+        self.address = (host_ip, host_port)
+        self.encoder = encoder
+        self.bytesize = bytesize
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.running = True
+        self.created_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        self.start_time = time.time()
+        self.version = "0.2.0"
+        self.current_user = None
+        self.database = Database()
+        self.auth = Auth(self.database)
+
+    def connection(self):
+        self.server_socket.bind(self.address)
+        self.server_socket.listen()
+        print("Waiting for a call from a Client...")
+
+        client_socket, client_address = self.server_socket.accept()
+        print(f"Connected with {client_address} ")
+        client_socket.send("Welcome Client!".encode(self.encoder))
+
+        while self.running:
+            
+            try:
+                self.client_request(client_socket)
+            except Exception as e:
+                print(f"Error: {e}")
+                break
+
+        if self.current_user:
+            self.database.clear_read_messages(self.current_user["username"])
+            print("Read messages were deleted.")
+        client_socket.close()
+        self.server_socket.close()
+        print("The server has been shut down")
+
+    def client_request(self, client_socket):
+        data = json.loads(client_socket.recv(self.bytesize).decode(self.encoder))
+        print(f"Client sent: {data}")
+        self.create_response(data, client_socket)
+
+    def create_response(self, data, client_socket):
+
+        command = data["cmd"]
+        public_commands = ["register", "login", "logout", "help", "stop"]
+
+        if command not in public_commands and (not self.current_user):
+            response = False
+        else:
+            handler = command_handlers.get(command, handle_unknown)
+            response = handler(self, data)
+
+        client_socket.send(json.dumps(response).encode(self.encoder))
+        if command == "stop":
+            self.running = False
+
+    def help(self):
+        commands = {
+        "uptime": "returns the server's lifetime",
+        "info": "returns the server's version number, its creation date",
+        "help": "returns a list of available commands with a short description",
+        "stop": "stops the server and the client simultaneously",
+        "register": "gives the option to register",
+        "login": "gives the option to login",
+        "user-info": "returns user data (other users data requires administrator rights)",
+        "user-edit": "gives the option to edit user data (requires administrator rights)",
+        "user-delete": "gives the option to delete user data (requires administrator rights)",
+        "send-msg": "sends a message to the user",
+        "inbox": "displays all user's messages",
+        "inbox-all": "displays all users' messages (requires administrator rights)",
+        "read-msg": "displays user's message",
+        "read-user-msg": "displays other user's message (requires administrator rights)",
+        "delete-msg": "deletes user's message",
+        "delete-user-msg": "deletes other user's message (requires administrator rights)"
+        }
+
+        return commands
+    
+    def uptime(self):
+        elapsed = time.time() - self.start_time
+        return self.format_elapsed_time(elapsed)
+
+    def format_elapsed_time(self, seconds):
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours}h {minutes}m {secs}s"
+
+if __name__ == "__main__":
+    server = Server()
+    server.connection()
+
+# --- .\server_handlers.py ---
+import time
+
+def handle_register(server, data):
+    username, password = data['username'], data['password']
+
+    if server.current_user and server.current_user["role"] == "admin":
+        if server.auth.register_user(username, password):
+            server.auth.refresh_users()
+            return "Registration successful. Now you can log in."
+        else:
+            return "Registration failed."
+    else:
+        return "You need to login as Admin to register new user."
+    
+def handle_login(server, data):
+    if not server.current_user: 
+        username, password = data['username'], data['password']
+
+        if server.auth.login_user(username, password):
+            server.current_user = server.auth.get_user_info(username)
+            return f"You have logged in successfully. Welcome {username}"
+        else:
+            return "Login failed. Please try again."
+    else:
+        return "You are already log in."
+    
+def handle_logout(server, data):
+    if server.current_user: 
+        server.current_user = None
+        return f"You have logged out successfully."
+    else:
+        return "You need to log in first."
+
+def handle_uptime(server, data):
+    return server.uptime()
+
+def handle_info(server, data):
+    return {"created_at": server.created_at, "version": server.version}
+
+def handle_help(server, data):
+    return server.help()
+
+def handle_stop(server, data):
+    print("Client ended the call.")
+    return "The server was stopped at the request of the client. Goodbye"
+
+def handle_user_info(server, data):
+    username = data['username']
+
+    if not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    elif username != server.current_user["username"] and server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    else:
+        return server.auth.get_user_info(username)
+    
+def handle_user_edit(server, data):
+    username, parameter, new_value, = data['username'], data['parameter'], data['new_value']
+
+    if not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    elif server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    elif parameter in {"id", "username", "password", "role"}:
+        print(f"{username} data has been edited")
+        server.auth.edit_user(username, parameter, new_value)
+        server.auth.refresh_users()
+        return f"{username} {parameter} has been edited."
+    else:
+        return "Invalid or inaccessible parameter."
+
+def handle_user_delete(server, data):
+    username = data['username']
+
+    if not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    elif server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    else:
+        print(f"{username} was deleted from database.")
+        server.auth.delete_user(username)
+        server.auth.refresh_users()
+        return f"{username} was deleted from database."
+
+def handle_send_message(server, data):
+    sender = server.current_user["username"]
+    precipient = data["precipient"]
+    message = data["message"]
+    MAX_USER_MESSAGES = 5
+    MAX_MESSAGE_LENGTH = 255
+    
+    if server.current_user["username"] == precipient:
+        return "Cannot send message to yourself."
+    elif not server.auth.get_user_info(precipient):
+        return "User doesn't exists."
+    elif len(server.database.get_user_messages(precipient)) == MAX_USER_MESSAGES:
+        return "Recipient's inbox is full"
+    elif len(message) > MAX_MESSAGE_LENGTH:
+        return "The message can contain a maximum of 255 characters."
+    else:
+        message_data = {"sender": sender, "message": message, "sent_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), "was_read": False}
+        print(message_data)
+        server.database.add_user_message(precipient, message_data)
+        return f"Message to {precipient} was sent."
+
+def handle_read_messages(server, data):
+    nums_of_messages = len(server.database.get_user_messages(server.current_user["username"]))
+    if nums_of_messages == 0:
+        return "No incoming messages."
+    else:
+        return server.database.get_user_messages(server.current_user["username"])
+    
+def handle_read_messages_all(server, data):
+    username = data['username']
+
+    if server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    elif not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    else:
+        return server.database.get_user_messages(username)
+    
+def handle_read_message(server, data):
+    msg_num = data["msg_num"]
+    nums_of_messages = len(server.database.get_user_messages(server.current_user["username"]))
+    if int(msg_num) <= 0 or int(msg_num) > nums_of_messages:
+        return "Incorrect number."
+    else:
+        num = int(msg_num) - 1
+        server.database.read_message(server.current_user["username"], num)
+        print(server.database.get_user_messages(server.current_user["username"])[num])
+        return server.database.get_user_messages(server.current_user["username"])[num]
+    
+def handle_read_user_message(server, data):
+    msg_num = data["msg_num"]
+    username = data["username"]
+
+    if server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    elif not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    else:
+        nums_of_messages = len(server.database.get_user_messages(username))
+        if int(msg_num) <= 0 or int(msg_num) > nums_of_messages:
+            return "Incorrect number."
+        else:
+            num = int(msg_num) - 1
+            print(server.database.get_user_messages(username)[num])
+            return server.database.get_user_messages(username)[num]
+        
+def handle_delete_message(server, data):
+    msg_num = data["msg_num"]
+    nums_of_messages = len(server.database.get_user_messages(server.current_user["username"]))
+
+    if int(msg_num) <= 0 or int(msg_num) > nums_of_messages:
+        return "Incorrect number."
+    else:
+        num = int(msg_num) - 1
+        server.database.delete_message(server.current_user["username"], num)
+        print(f"{server.current_user["username"]}'s message was deleted from database.")
+        return "Message was deleted from database."
+
+def handle_delete_user_message(server, data):
+    msg_num = data["msg_num"]
+    username = data["username"]
+
+    if server.current_user["role"] != "admin":
+        return "Access denied. Please contact admin."
+    elif not server.auth.get_user_info(username):
+        return "User doesn't exists."
+    else:
+        nums_of_messages = len(server.database.get_user_messages(username))
+        if int(msg_num) <= 0 or int(msg_num) > nums_of_messages:
+            return "Incorrect number."
+        else:
+            num = int(msg_num) - 1
+            server.database.delete_message(username, num)
+            print(f"{username}'s was deleted from database.")
+            return f"{username}'s message was deleted from database."
+
+def handle_unknown(server, data):
+    return "Unknown command"
+
+command_handlers = {
+    "uptime": handle_uptime,
+    "info": handle_info,
+    "help": handle_help,
+    "stop": handle_stop,
+    "register": handle_register,
+    "login": handle_login,
+    "logout": handle_logout,
+    "user-info": handle_user_info,
+    "user-edit" : handle_user_edit,
+    "user-delete": handle_user_delete,
+    "send-msg": handle_send_message,
+    "inbox": handle_read_messages,
+    "inbox-all": handle_read_messages_all,
+    "read-msg": handle_read_message,
+    "read-user-msg": handle_read_user_message,
+    "delete-msg": handle_delete_message,
+    "delete-user-msg": handle_delete_user_message
+}
+
+# --- .\utils.py ---
+import bcrypt
+
+ENCODER = "utf-8"
+
+def hash_password(password):
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode(ENCODER), salt)
+    return hashed.decode(ENCODER)
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode(ENCODER), hashed.encode(ENCODER))
+
+# --- .\tests\test_auth.py ---
+import unittest
+from unittest.mock import patch, MagicMock
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from auth import Auth
+
+
+class TestAuth(unittest.TestCase):
+
+    def setUp(self):
+        # Patching
+        self.patcher_db = patch("auth.Database")
+        self.patcher_hash = patch("auth.hash_password")
+        self.patcher_check = patch("auth.check_password")
+
+        # Start patchy
+        self.mock_db_class = self.patcher_db.start()
+        self.mock_hash = self.patcher_hash.start()
+        self.mock_check = self.patcher_check.start()
+
+        # Cleanup patchy
+        self.addCleanup(self.patcher_db.stop)
+        self.addCleanup(self.patcher_hash.stop)
+        self.addCleanup(self.patcher_check.stop)
+
+        # Domyślne wartości zwracane przez mocki
+        self.mock_hash.return_value = "hashed_pwd"
+        self.mock_check.return_value = True
+
+        # Konfiguracja mocka bazy danych
+        self.mock_db = MagicMock()
+        self.mock_db.get_users.return_value = []
+        self.mock_db.set_users = MagicMock()
+        self.mock_db_class.return_value = self.mock_db
+
+        # Auth korzysta z mock_db
+        self.auth = Auth(self.mock_db) # ręcznie podstawiamy mocka
+        self.auth.users = []
+
+    def test_register_user_success(self):
+        result = self.auth.register_user("testuser", "secret")
+        self.assertTrue(result)
+        self.mock_db.set_users.assert_called_once()
+
+    def test_register_duplicate_user(self):
+        self.auth.users = [{"username": "testuser", "password": "hashed_pwd"}]
+
+        result = self.auth.register_user("testuser", "secret")
+        self.assertFalse(result)
+        self.mock_db.set_users.assert_not_called()
+
+    def test_register_empty_login_or_password(self):
+        result = self.auth.register_user("", "secret")
+        result2 = self.auth.register_user("testuser", "")
+        self.assertFalse(result)
+        self.assertFalse(result2)
+        self.mock_db.set_users.assert_not_called()
+        
+    def test_login(self):
+        self.auth.users = [{"username": "testuser", "password": "hashed_pwd"}]
+
+        # udane logowanie
+        result_login = self.auth.login_user("testuser", "password123")
+        self.assertTrue(result_login)
+        self.mock_check.assert_called_once_with("password123", "hashed_pwd")
+
+        # nieudane logowanie
+        result_login = self.auth.login_user("baduser", "nieznam")
+        self.assertFalse(result_login)
+        self.assertEqual(self.mock_check.call_count, 1)
+
+    def test_create_user(self):
+        user = self.auth.create_user("Arkadiusz", "123456")
+
+        self.assertIsInstance(user["id"], str)
+        self.assertEqual(user["username"], "Arkadiusz")
+        self.assertEqual(user["password"], "hashed_pwd")
+        self.assertEqual(user["messages"], [])
+        self.assertEqual(user["role"], "user")
+
+        self.mock_hash.assert_called_once_with("123456")
+
+    def test_delete_user(self):
+        self.auth.users = [{"username": "testuser", "password": "hashed_pwd"}]
+        self.auth.delete_user("testuser")
+        self.mock_db.set_users.assert_called_once()
+        self.assertEqual(self.auth.users, [])
+
+    def test_edit_user(self):
+        self.auth.users = [{"username": "testuser", "password": "hashed_pwd"}]
+        self.auth.edit_user("testuser", "username", "Tadek")
+        self.mock_db.set_users.assert_called_once()
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+# --- .\tests\test_auth_integration.py ---
+import unittest
+import json
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from auth import Auth
+from database import Database
+from utils import check_password
+
+FAKE_DB_TEMPLATE = {
+    "users": []
+}
+
+DB_PATH = "db_fake.json"
+
+class TestAuthIntegration(unittest.TestCase):
+
+    def setUp(self):
+        with open(DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(FAKE_DB_TEMPLATE, f, indent=4)
+
+        self.db = Database(DB_PATH)
+        self.auth = Auth(self.db)
+
+    def tearDown(self):
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+
+    def test_register_user_success(self):
+        result = self.auth.register_user("testuser", "secret")
+        self.assertTrue(result)
+        users = self.db.get_users()
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0]["username"], "testuser")
+        self.assertTrue(check_password("secret", users[0]["password"]))
+
+    def test_register_duplicate_user(self):
+        self.auth.register_user("testuser", "secret")
+        result = self.auth.register_user("testuser", "secret2")
+        self.assertFalse(result)
+        users = self.db.get_users()
+        self.assertEqual(len(users), 1)
+
+    def test_register_empty_login_or_password(self):
+        result1 = self.auth.register_user("", "haslo")
+        result2 = self.auth.register_user("user", "")
+        self.assertFalse(result1)
+        self.assertFalse(result2)
+        self.assertEqual(len(self.db.get_users()), 0)
+
+    def test_login(self):
+        self.auth.register_user("loginuser", "mypassword")
+        # Poprawne dane
+        result_ok = self.auth.login_user("loginuser", "mypassword")
+        self.assertTrue(result_ok)
+
+        # Niepoprawny użytkownik
+        result_fail = self.auth.login_user("unknown", "mypassword")
+        self.assertFalse(result_fail)
+
+        # Złe hasło
+        result_wrong_pass = self.auth.login_user("loginuser", "wrongpass")
+        self.assertFalse(result_wrong_pass)
+
+    def test_create_user(self):
+        user = self.auth.create_user("Arkadiusz", "123456")
+        self.assertEqual(user["username"], "Arkadiusz")
+        self.assertEqual(user["messages"], [])
+        self.assertEqual(user["role"], "user")
+        self.assertTrue(check_password("123456", user["password"]))
+
+    def test_delete_user(self):
+        self.auth.register_user("todelete", "pass")
+        self.auth.delete_user("todelete")
+        users = self.db.get_users()
+        self.assertEqual(users, [])
+
+    def test_edit_user(self):
+        self.auth.register_user("editor", "haslo")
+        self.auth.edit_user("editor", "username", "newname")
+        users = self.db.get_users()
+        self.assertEqual(users[0]["username"], "newname")
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+# --- .\tests\test_client.py ---
+import unittest
+from unittest.mock import MagicMock, patch
+import io
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from client import Client
+import json
+
+class TestClient(unittest.TestCase):
+
+    def setUp(self):
+        # Ukrycie printów
+        self.patcher = patch('sys.stdout', new=io.StringIO())
+        self.mock_stdout = self.patcher.start()
+
+        self.client = Client()
+        self.client.client_socket = MagicMock()
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_build_request_with_simple_command_help(self):
+        request = self.client.build_request("help")
+        self.assertEqual(request, {"cmd": "help"})
+
+    def test_build_request_with_simple_command_stop(self):
+        request = self.client.build_request("stop")
+        self.assertEqual(request, {"cmd": "stop"})
+
+    
+    @patch("builtins.input", return_value="testuser") # mock_getpass
+    @patch("getpass.getpass", return_value="testpass") # mock_input
+    def test_build_request_with_command_login(self, mock_getpass, mock_input):
+        request = self.client.build_request("login")
+        self.assertEqual(request, {
+            "cmd": "login",
+            "username": "testuser",
+            "password": "testpass"
+        })
+
+    @patch("builtins.input", return_value="newuser") # mock_getpass
+    @patch("getpass.getpass", return_value="newpass") # mock_input
+    def test_build_request_with_command_register(self, mock_getpass, mock_input):
+        request = self.client.build_request("register")
+        self.assertEqual(request, {
+            "cmd": "register",
+            "username": "newuser",
+            "password": "newpass"
+        })
+
+    @patch("builtins.input", return_value="some_value") # mock_input
+    def test_build_request_with_command_send_msg(self, mock_input_message):
+        request = self.client.build_request("send-msg")
+        self.assertEqual(request, {
+            "cmd": "send-msg",
+            "recipient": "some_value",
+            "message": "some_value"
+        })
+
+    def test_build_request_with_unknown_command(self):
+        request = self.client.build_request("nieznana-komenda")
+        self.assertEqual(request, None)
+
+    @patch("builtins.print")
+    def test_response_false_requires_login(self, mock_print):
+        self.client.client_socket.recv.return_value = json.dumps(False).encode(self.client.encoder)
+
+        response = self.client.get_response("inbox", self.client.client_socket)
+        self.assertFalse(response)
+
+        mock_print.assert_any_call("You must be logged in to use this command.")
+
+    @patch("client.command_handlers", {"info": lambda data: True})
+    def test_response_with_valid_handler_returns_true(self):
+        response_data = {"created_at": "01-05-2025", "version": "0.2.0"}
+        self.client.client_socket.recv.return_value = json.dumps(response_data).encode(self.client.encoder)
+
+        response = self.client.get_response("info", self.client.client_socket)
+
+        self.assertTrue(response)
+
+    @patch("builtins.print")
+    def test_invalid_json_raises_json_decode_error(self, mock_print):
+        self.client.client_socket.recv.return_value = b'{invalid_json'
+
+        result = self.client.get_response("any", self.client.client_socket)
+
+        self.assertFalse(result)
+        mock_print.assert_any_call("Error decoding JSON response.")
+
+    @patch("client.command_handlers", new={})
+    def test_no_handler_returns_false(self):
+        response_data = {"some": "data"}
+        self.client.client_socket.recv.return_value = json.dumps(response_data).encode(self.client.encoder)
+
+        result = self.client.get_response("unknown_command", self.client.client_socket)
+
+        self.assertFalse(result)
+
+    @patch("builtins.input", return_value="test_user")
+    @patch("getpass.getpass", return_value="secret123")
+    def test_login_register(self, mock_getpass, mock_input):
+        result = self.client._login_register("login")
+        self.assertEqual(result, {"cmd": "login", "username": "test_user", "password": "secret123"})
+
+    @patch("builtins.input", return_value="admin")
+    def test_user_info(self, mock_input):
+        result = self.client._user_info("user-info")
+        self.assertEqual(result, {"cmd": "user-info", "username": "admin"})
+
+    @patch("builtins.input", side_effect=["admin", "password"])
+    @patch("getpass.getpass", return_value="new_secret")
+    def test_user_edit_password(self, mock_getpass, mock_input):
+        result = self.client._user_edit("user-edit")
+        self.assertEqual(result, {
+            "cmd": "user-edit",
+            "username": "admin",
+            "parameter": "password",
+            "new_value": "new_secret"
+        })
+
+    @patch("builtins.input", side_effect=["admin", "email", "new@example.com"])
+    def test_user_edit_email(self, mock_input):
+        result = self.client._user_edit("user-edit")
+        self.assertEqual(result, {
+            "cmd": "user-edit",
+            "username": "admin",
+            "parameter": "email",
+            "new_value": "new@example.com"
+        })
+
+    @patch("builtins.input", side_effect=["julia", "hello world!"])
+    def test_send_msg(self, mock_input):
+        result = self.client._send_msg("send-msg")
+        self.assertEqual(result, {
+            "cmd": "send-msg",
+            "recipient": "julia",
+            "message": "hello world!"
+        })
+
+    @patch("builtins.input", side_effect=["-1", "0", "abc", "2"])
+    @patch("builtins.print")
+    def test_read_msg_with_invalid_and_valid_inputs(self, mock_print, mock_input):
+        result = self.client._read_msg("read-msg")
+        self.assertEqual(result, {"cmd": "read-msg", "msg_num": "2"})
+
+        self.assertEqual(mock_print.call_count, 3) # dla -1, 0, abc
+        mock_print.assert_called_with("Please enter a valid positive integer.")
+
+    @patch("builtins.input", side_effect=["john", "-1", "abc", "0", "2"])
+    @patch("builtins.print")
+    def test_read_user_msg_with_invalid_and_valid_inputs(self, mock_print, mock_input):
+        result = self.client._read_user_msg("read-user-msg")
+
+        self.assertEqual(result, {
+            "cmd": "read-user-msg",
+            "username": "john",
+            "msg_num": "2"
+        })
+
+        self.assertEqual(mock_print.call_count, 3) # dla -1, abc, 0
+        mock_print.assert_called_with("Please enter a valid positive integer for message number.")
+
+    @patch("builtins.input", return_value="admin")
+    def test_inbox_all(self, mock_input):
+        result = self.client._inbox_all("inbox-all")
+        self.assertEqual(result, {"cmd": "inbox-all", "username": "admin"})
+
+    @patch("builtins.input", side_effect=["abc", "0", "-1", "5"])
+    @patch("builtins.print")
+    def test_delete_msg_with_invalid_and_valid_inputs(self, mock_print, mock_input):
+        result = self.client._delete_msg("delete-msg")
+        self.assertEqual(result, {"cmd": "delete-msg", "msg_num": "5"})
+
+        self.assertEqual(mock_print.call_count, 3) # dla -1, abc, 0
+        mock_print.assert_called_with("Please enter a valid positive integer for message number.")
+
+    @patch("builtins.input", side_effect=["julia", "abc", "0", "-1", "2"])
+    @patch("builtins.print")
+    def test_delete_user_msg_with_invalid_and_valid_inputs(self, mock_print, mock_input):
+        result = self.client._delete_user_msg("delete-user-msg")
+        self.assertEqual(result, {
+            "cmd": "delete-user-msg",
+            "username": "julia",
+            "msg_num": "2"
+        })
+        
+        self.assertEqual(mock_print.call_count, 3) # dla -1, abc, 0
+        mock_print.assert_called_with("Please enter a valid positive integer for message number.")
+
+if __name__ == '__main__':
+    unittest.main()
+
+# --- .\tests\test_database.py ---
+import unittest
+import json
+import os
+from database import Database
+
+FAKE_DB = {
+    "users": [
+        {
+            "username": "Arek",
+            "password": "secret",
+            "messages": [{"message": "hi", "was_read": False}]
+        },
+         {
+            "username": "Julia",
+            "password": "tajemnica",
+            "messages": [{"message": "Lubię ISU", "was_read": False}]
+        }
+    ]
+}
+
+DB_PATH = "db_fake.json"
+
+class TestDatabase(unittest.TestCase):
+
+    def setUp(self):
+        with open(DB_PATH, "w", encoding="utf-8") as file:
+            json.dump(FAKE_DB, file, indent=4)
+
+    def tearDown(self):
+        # Usuwamy plik po teście
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+
+    def test_load(self):
+        db = Database(DB_PATH)
+        self.assertEqual(db.get_users()[0]["username"], "Arek")
+        self.assertEqual(db.get_users()[1]["password"], "tajemnica")
+
+    def test_save(self):
+        db = Database(DB_PATH)
+        new_users = [{"username": "Andrzej", "password": "hehehe", "messages": []}]
+        db.set_users(new_users)
+        self.assertEqual(db.data["users"], new_users)
+        with open(DB_PATH, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            self.assertEqual(data["users"], new_users)
+
+    def test_get_user_messages(self):
+        db = Database(DB_PATH)
+        messages = db.get_user_messages("Julia")
+        self.assertEqual(messages[0]["message"], "Lubię ISU")
+
+    def test_set_user_messages(self):
+        db = Database(DB_PATH)
+        messages = db.get_user_messages("Julia")
+        messages.append({"message": "Hmmmm, to nie tak", "was_read": False})
+        db.set_user_messages("Julia", messages)
+        stored = db.get_user_messages("Julia")
+        self.assertEqual(stored, messages)
+        self.assertEqual(len(stored), 2)
+
+    def test_add_new_message(self):
+        db = Database(DB_PATH)
+        db.add_user_message("Julia", {"message": "Hmmmm, to nie tak", "was_read": False})
+        messages = db.get_user_messages("Julia")
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[-1]["message"], "Hmmmm, to nie tak")
+
+    def test_delete_new_message(self):
+        db = Database(DB_PATH)
+        db.delete_message("Julia", 0)
+        messages = db.get_user_messages("Julia")
+        self.assertEqual(len(messages), 0)
+
+if __name__ == '__main__':
+    unittest.main()
+
+# --- .\tests\test_server.py ---
+import unittest
+from unittest.mock import MagicMock, patch
+import io
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import time
+import json
+from server import Server
+from server_handlers import handle_unknown
+
+class TestServer(unittest.TestCase):
+
+    def setUp(self):
+        # Ukrycie printów
+        self.patcher = patch('sys.stdout', new=io.StringIO())
+        self.mock_stdout = self.patcher.start()
+
+        self.server = Server()
+
+        # Mock dla socketa, database, auth
+        self.server.server_socket = MagicMock()
+        self.server.database = MagicMock()
+        self.server.auth = MagicMock()
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_format_elapsed_time(self):
+        formatted = Server.format_elapsed_time(self.server, 3661)
+        self.assertEqual(formatted, "1h 1m 1s")
+
+    def test_uptime_returns_correct_format(self):
+        with patch('time.time', return_value=self.server.start_time + 3661):
+            uptime_str = Server.uptime(self.server)
+            self.assertEqual(uptime_str, "1h 1m 1s")
+
+    def test_help_contains_expected_commands(self):
+        commands = Server.help(self.server)
+        assert "register" in commands
+        assert "user-edit" in commands
+        assert commands["stop"] == "stops the server and the client simultaneously"
+
+    def test_create_response_calls_correct_handler(self):
+        data = {"cmd": "info"}
+        self.server.create_response(data, self.server.server_socket)
+        self.server.server_socket.send.assert_called()
+    
+    def test_inbox_command_not_logged_in(self):
+        data = {"cmd": "inbox"}
+        self.server.create_response(data, self.server.server_socket)
+        expected_response = json.dumps(False).encode(self.server.encoder)
+        self.server.server_socket.send.assert_called_once_with(expected_response)
+
+    def test_stop_command_stops_server(self):
+        data = {"cmd": "stop"}
+        self.server.create_response(data, self.server.server_socket)
+        self.assertFalse(self.server.running)
+
+    def test_unknown_command_calls_handle_unknown(self):
+        data = {"cmd": "nieznana_komenda"}
+        self.server.current_user = {"username": "admin", "role": "admin"}
+        self.server.create_response(data, self.server.server_socket)
+        expected_response = json.dumps("Unknown command").encode(self.server.encoder)
+        self.server.server_socket.send.assert_called_once_with(expected_response)
+
+# --- .\tests\test_server_handlers.py ---
+import unittest
+from unittest.mock import MagicMock, patch
+import io
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from server_handlers import (
+    handle_register, handle_login, handle_logout, handle_uptime, handle_info,
+    handle_help, handle_stop, handle_user_info, handle_user_edit, handle_user_delete,
+    handle_send_message, handle_read_messages, handle_read_messages_all,
+    handle_read_message, handle_read_user_message, handle_delete_message,
+    handle_delete_user_message, handle_unknown
+)
+import copy
+
+FAKE_DB = {
+    "users": [
+        {
+            "username": "ajek93",
+            "password": "secret",
+            "messages": [{"message": "hi", "was_read": False}],
+            "role": "admin"
+        },
+         {
+            "username": "Julia",
+            "password": "tajemnica",
+            "messages": [{"message": "Lubię ISU", "was_read": False}],
+            "role": "user"
+        }
+    ]
+}
+
+class TestServerHandlers(unittest.TestCase):
+
+    def setUp(self):
+        # Ukrycie printów
+        self.patcher = patch('sys.stdout', new=io.StringIO())
+        self.mock_stdout = self.patcher.start()
+
+        # Mock dla klasy Server
+        self.mock_server = MagicMock()
+        self.mock_server.current_user = {"username": "ajek93", "role": "admin"}
+        self.mock_server.created_at = "2024-01-01"
+        self.mock_server.version = "1.0"
+        self.mock_server.uptime.return_value = "Server uptime: 2h"
+        self.mock_server.help.return_value = "Available commands: info, help, login, logout..."
+
+        # Mock dla klasy Auth
+        self.mock_server.auth = MagicMock()
+
+        self.mock_server.auth.register_user.return_value = True
+        self.mock_server.auth.login_user.return_value = True
+
+        def mock_get_user_info(username):
+            if username == "admin":
+                return {"username": username, "role": "admin"}
+            elif username == "user1":
+                return {"username": username, "role": "user"}
+            elif username == "ajek93":
+                return {"username": username, "role": "admin"}
+            elif username == "Julia":
+                return {"username": username, "role": "user"}
+            else:
+                return None
+    
+        self.mock_server.auth.get_user_info.side_effect = mock_get_user_info
+        self.mock_server.auth.edit_user = MagicMock()
+        self.mock_server.auth.delete_user = MagicMock()
+        self.mock_server.auth.refresh_users = MagicMock()
+
+        # Mock dla klasy Database
+        self.mock_server.database = MagicMock()
+        self.mock_server.database.data = copy.deepcopy(FAKE_DB)
+        print(self.mock_server.database.data)
+        mock_messages = [{"sender": "user1", "message": "Hello", "sent_at": "2024-01-01 12:00:00", "was_read": False}, {"sender": "user2", "message": "Bye", "sent_at": "2024-01-01 18:00:00", "was_read": False}]
+        self.mock_server.database.get_user_messages.return_value = mock_messages
+        self.mock_server.database.add_user_message.side_effect = lambda username, msg: mock_messages.append(msg)
+        self.mock_server.database.read_message = MagicMock()
+        self.mock_server.database.delete_message.side_effect = lambda username, msg: mock_messages.pop(msg)
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_handle_info(self):
+        result = handle_info(self.mock_server, data={})
+        self.assertEqual(result, {"created_at": self.mock_server.created_at, "version": self.mock_server.version})
+
+    def test_handle_help(self):
+        result = handle_help(self.mock_server, data={})
+        self.assertEqual(result, "Available commands: info, help, login, logout...")
+
+    def test_handle_uptime(self):
+        result = handle_uptime(self.mock_server, data={})
+        self.assertEqual(result, "Server uptime: 2h")
+
+    def test_handle_stop(self):
+        result = handle_stop(self.mock_server, data={})
+        self.assertEqual(result, "The server was stopped at the request of the client. Goodbye")
+
+    def test_handle_register_success_by_admin(self):
+        result = handle_register(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, "Registration successful. Now you can log in.")
+
+    def test_handle_register_failed_by_admin(self):
+        self.mock_server.auth.register_user.return_value = False
+        result = handle_register(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, "Registration failed.")
+
+    def test_handle_register_failed_by_user_access_denied(self):
+        self.mock_server.current_user = {"username": "user1", "role": "user"}
+        result = handle_register(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, "You need to login as Admin to register new user.")
+
+    def test_handle_login_success(self):
+        self.mock_server.current_user = None
+        result = handle_login(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, f"You have logged in successfully. Welcome Julia")
+
+    def test_handle_login_failed_wrong_login_or_password(self):
+        self.mock_server.current_user = None
+        self.mock_server.auth.login_user.return_value = False
+        result = handle_login(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, f"Login failed. Please try again.")
+
+    def test_handle_login_failed_after_earlier_success_login(self):
+        result = handle_login(self.mock_server, data={"username": "Julia", "password": "rel"})
+        self.assertEqual(result, f"You are already log in.")
+
+    def test_handle_logout_success(self):
+        result = handle_logout(self.mock_server, data={})
+        self.assertEqual(result, "You have logged out successfully.")
+
+    def test_handle_logout_failed_without_login(self):
+        self.mock_server.current_user = None
+        result = handle_logout(self.mock_server, data={})
+        self.assertEqual(result, "You need to log in first.")
+
+    def test_user_info_failed_user_not_exists(self):
+        result = handle_user_info(self.mock_server, data={"username": "Stasia"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_user_info_failed_by_user_when_access_denied(self):
+        self.mock_server.current_user = {"username": "user1", "role": "user"}
+        result = handle_user_info(self.mock_server, data={"username": "admin"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_user_info_success_by_admin(self):
+        result = handle_user_info(self.mock_server, data={"username": "user1"})
+        self.assertEqual(result, {'username': 'user1', 'role': 'user'})
+
+    def test_user_info_success_by_user(self):
+        self.mock_server.current_user = {"username": "user1", "role": "user"}
+        result = handle_user_info(self.mock_server, data={"username": "user1"})
+        
+        self.assertEqual(result, {'username': 'user1', 'role': 'user'})
+
+    def test_handle_user_edit_failed_user_not_exists(self):
+        result = handle_user_edit(self.mock_server, data={"username": "Stasia", "parameter": "username", "new_value": "Stasia"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_user_edit_failed_by_user_access_denied(self):
+        self.mock_server.current_user = {"username": "Julia", "role": "user"}
+        result = handle_user_edit(self.mock_server, data={"username": "ajek93", "parameter": "username", "new_value": "Staszek"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_handle_user_edit_failed_by_admin_with_wrong_parameter(self):
+        result = handle_user_edit(self.mock_server, data={"username": "ajek93", "parameter": "lastname", "new_value": "Staszek"})
+        self.assertEqual(result, "Invalid or inaccessible parameter.")
+
+    def test_handle_user_edit_success(self):
+        result = handle_user_edit(self.mock_server, data={"username": "ajek93", "parameter": "username", "new_value": "Staszek"})
+        self.mock_server.auth.edit_user.assert_called_once_with("ajek93", "username", "Staszek")
+        self.mock_server.auth.refresh_users.assert_called_once()
+        self.assertEqual(result, "ajek93 username has been edited.")
+
+    def test_handle_user_delete_failed_user_not_exists(self):
+        self.mock_server.auth.get_user_info.return_value = None
+        result = handle_user_delete(self.mock_server, data={"username": "Ghost"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_user_delete_failed_by_user_access_denied(self):
+        self.mock_server.current_user = {"username": "Julia", "role": "user"}
+        self.mock_server.auth.get_user_info.return_value = {"username": "ajek93", "role": "admin"}
+        result = handle_user_delete(self.mock_server, data={"username": "ajek93"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_handle_user_delete_success(self):
+        self.mock_server.auth.get_user_info.return_value = {"username": "Julia", "role": "user"}
+        result = handle_user_delete(self.mock_server, data={"username": "Julia"})
+        self.mock_server.auth.delete_user.assert_called_once_with("Julia")
+        self.mock_server.auth.refresh_users.assert_called_once()
+        self.assertEqual(result, "Julia was deleted from database.")
+
+    def test_handle_send_message_failed_send_to_yourself(self):
+        result = handle_send_message(self.mock_server, data={"precipient": "ajek93", "message": "Hello"})
+        self.assertEqual(result, "Cannot send message to yourself.")
+
+    def test_handle_send_message_failed_user_not_exists(self):
+        result = handle_send_message(self.mock_server, data={"precipient": "Bogdan", "message": "Hello"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_send_message_failed_recipient_inbox_full(self):
+        self.mock_server.database.get_user_messages.return_value = [{"sender": "user1", "message": "Hello", "sent_at": "2024-01-01 12:00:00", "was_read": False}, {"sender": "user2", "message": "Bye", "sent_at": "2024-01-01 18:00:00", "was_read": False}, {"sender": "user1", "message": "Hello", "sent_at": "2024-01-01 12:00:00", "was_read": False}, {"sender": "user1", "message": "Hello", "sent_at": "2024-01-01 12:00:00", "was_read": False},{"sender": "user1", "message": "Hello", "sent_at": "2024-01-01 12:00:00", "was_read": False}]
+        result = handle_send_message(self.mock_server, data={"precipient": "Julia", "message": "Hello"})
+        self.assertEqual(result, "Recipient's inbox is full")
+
+    def test_handle_send_message_failed_too_long_message(self):
+        result = handle_send_message(self.mock_server, data={"precipient": "Julia", "message": f'{"Hello" + "o" * 255}'})
+        self.assertEqual(result, "The message can contain a maximum of 255 characters.")
+
+    def test_handle_send_message_success(self):
+        result = handle_send_message(self.mock_server, data={"precipient": "Julia", "message": "Hello"})
+        self.mock_server.database.add_user_message.assert_called_once()
+        self.assertEqual(result, "Message to Julia was sent.")
+
+    def test_handle_read_messages_empty_inbox(self):
+        self.mock_server.database.get_user_messages.return_value = {}
+        result = handle_read_messages(self.mock_server, data={})
+        self.mock_server.database.get_user_messages.assert_called_once()
+        self.assertEqual(result, "No incoming messages.")
+
+    def test_handle_read_messages_with_some_data(self):
+        result = handle_read_messages(self.mock_server, data={})
+        self.assertEqual(result, self.mock_server.database.get_user_messages.return_value)
+        self.assertEqual(len(self.mock_server.database.get_user_messages.return_value), 2)
+
+    def test_handle_read_messages_all_failed_access_denied(self):
+        self.mock_server.current_user = {"username": "user1", "role": "user"}
+        result = handle_read_messages_all(self.mock_server, data={"username": "ajek93"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_handle_read_messages_all_failed_user_not_exists(self):
+        result = handle_read_messages_all(self.mock_server, data={"username": "Bogdan"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_read_messages_all_success(self):
+        result = handle_read_messages_all(self.mock_server, data={"username": "Julia"})
+        self.assertEqual(result, self.mock_server.database.get_user_messages.return_value)
+
+    def test_handle_read_message_failed_incorrect_number(self):
+        result = handle_read_message(self.mock_server, data={"msg_num": 11})
+        self.assertEqual(result, "Incorrect number.")
+
+    def test_handle_read_message_success(self):
+        result = handle_read_message(self.mock_server, data={"msg_num": 1})
+        self.assertEqual(result, self.mock_server.database.get_user_messages.return_value[0])
+
+    def test_handle_read_user_message_failed_access_denied(self):
+        self.mock_server.current_user = {"username": "user1", "role": "user"}
+        result = handle_read_user_message(self.mock_server, data={"msg_num": 1, "username": "ajek93"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_handle_read_user_message_failed_user_not_exists(self):
+        result = handle_read_user_message(self.mock_server, data={"msg_num": 1, "username": "Bogdan"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_read_user_message_failed_incorrect_number(self):
+        result = handle_read_user_message(self.mock_server, data={"msg_num": 11, "username": "Julia"})
+        self.assertEqual(result, "Incorrect number.")
+
+    def test_handle_read_user_message_success(self):
+        result = handle_read_user_message(self.mock_server, data={"msg_num": 1, "username": "Julia"})
+        self.assertEqual(result, self.mock_server.database.get_user_messages.return_value[0])
+
+    def test_handle_delete_message_failed_incorrect_number(self):
+        self.mock_server.current_user = {"username": "Julia", "role": "user"}
+        result = handle_delete_message(self.mock_server, data={"msg_num": 99})
+        self.assertEqual(result, "Incorrect number.")
+
+    def test_handle_delete_message_success(self):
+        self.mock_server.current_user = {"username": "Julia", "role": "user"}
+        result = handle_delete_message(self.mock_server, data={"msg_num": 1})
+        self.assertEqual(result, "Message was deleted from database.")
+        self.mock_server.database.delete_message.assert_called_once_with("Julia", 0)
+
+    def test_handle_delete_user_message_failed_access_denied(self):
+        self.mock_server.current_user = {"username": "Julia", "role": "user"}
+        result = handle_delete_user_message(self.mock_server, data={"msg_num": 1, "username": "ajek93"})
+        self.assertEqual(result, "Access denied. Please contact admin.")
+
+    def test_handle_delete_user_message_failed_user_not_exists(self):
+        result = handle_delete_user_message(self.mock_server, data={"msg_num": 1, "username": "Bogdan"})
+        self.assertEqual(result, "User doesn't exists.")
+
+    def test_handle_delete_user_message_failed_incorrect_number(self):
+        result = handle_delete_user_message(self.mock_server, data={"msg_num": 11, "username": "Julia"})
+        self.assertEqual(result, "Incorrect number.")
+
+    def test_handle_delete_user_message_success(self):
+        result = handle_delete_user_message(self.mock_server, data={"msg_num": 1, "username": "Julia"})
+        self.assertEqual(result, "Julia's message was deleted from database.")
+        self.mock_server.database.delete_message.assert_called_once_with("Julia", 0)
+
+if __name__ == '__main__':
+    unittest.main()
+
+# --- .\tests\test_utils.py ---
+import unittest
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from utils import hash_password, check_password
+
+class TestHashingPassword(unittest.TestCase):
+
+    def test_check_hashed_password(self):
+        password = "moje_tajne_hasło"
+        hashed_password = hash_password(password)
+
+        self.assertTrue(check_password(password, hashed_password))
+        self.assertFalse(check_password("mammamia", hashed_password))
+
+    def test_check_if_hashed_every_time(self):
+        password = "moje_bardzo_tajne_hasło"
+        hashed1 = hash_password(password)
+        hashed2 = hash_password(password)
+        
+        self.assertNotEqual(hashed1, hashed2)
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+# --- .\tests\__init__.py ---

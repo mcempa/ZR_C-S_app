@@ -1,0 +1,210 @@
+====================
+FILE: client.py
+import socket as s
+from lib import ClientManager
+
+with ClientManager() as client:
+    while True:
+        client.send_command()
+        response = client.recv_response()
+        client.print_response(response)   
+        if response == "stop" or not response:
+            break  # Wyjdź z pętli, jeśli response to "stop"
+        
+
+====================
+FILE: config.py
+HOST = "127.0.0.1"
+PORT = 64623
+
+====================
+FILE: lib.py
+import socket as s
+import time
+import os
+from datetime import datetime
+import json
+from config import *
+
+class ServerManager():
+    def __init__(self):
+        self.host = HOST
+        self.port = PORT
+        self.start_time = time.time()
+
+        self.command_map = {
+        "uptime": self.get_uptime,
+        "info": self.get_info,
+        "help": self.get_help,
+        } 
+
+    def __enter__(self):
+        # Otwórz połączenie
+        try:
+            self.server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(5)  # Umożliwienie nasłuchiwania na połączenia
+            print(f"Serwer uruchomiony na {self.host}:{self.port}")
+            return self  # Zwróć obiekt (nie gniazdo self.server_socket)
+        
+        except PermissionError:
+            print(f"Brak uprawnień do portu {self.port}")
+            raise
+        except s.error as e:
+            print(f"Błąd przy tworzeniu serwera: {e}")
+            raise
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Zamknij połączenie
+        if self.server_socket:
+            self.server_socket.close()
+            print("Serwer został zamknięty.")
+
+    def get_uptime(self):
+        uptime = round(time.time() - self.start_time, 0)
+        response = {
+            "czas życia serwera [s]" : uptime
+        }
+        jason_response = json.dumps(response, ensure_ascii=False, indent=4)
+        #data = json.loads(jason_response)  # Próba załadowania danych jako JSON
+        #print("Dane są w formacie JSON:", data)
+        return jason_response
+
+    def get_info(self):
+        ver_server = "0.1.0"
+        file_path = r"C:\Users\cempa\Documents\CODE\.cursor-tutor\client-server_app\C-S_ver_0.1\server.py"
+        creation_time = os.path.getctime(file_path)
+        creation_time_formatted = datetime.fromtimestamp(creation_time).strftime('%Y-%m-%d %H:%M:%S')
+        response = {
+        "wersja serwera" : ver_server,
+        "czas utworzenia serwera" : creation_time_formatted
+        }
+
+        jason_response = json.dumps(response, ensure_ascii=False, indent=4)
+        return jason_response
+
+    def get_help(self):
+        dict_help = {
+        "uptime" : "zwraca czas życia serwera",
+        "info"   : "zwraca numer wersji serwera, datę jego utworzenia",
+        "help"   : "zwraca listę dostępnych komend z krótkim opisem",
+        "stop"   : "zatrzymuje jednocześnie serwer i klienta",
+        }
+        jason_response = json.dumps(dict_help, ensure_ascii=False, indent=4)
+        return jason_response
+
+    def stop_client(self, client_socket):
+        mes = "stop"
+        print ("Połączenie z klientem zostaje zamknięte")
+        #client_socket.close()  # Zamknij połączenie z klientem
+        return  mes
+
+    def get_message(self):
+        mes = "Nieznana komenda"
+        return mes
+
+
+class ClientManager():
+    def __init__(self):
+        self.host = HOST
+        self.port = PORT
+    
+    def __enter__(self):
+        try:
+            #Otwórz połączenie
+            self.client_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
+            self.client_socket.connect((self.host, self.port))
+            return self   # !!!!! nie self.client_socket
+        
+        except ConnectionRefusedError:
+            print("Nie można połączyć się z serwerem - serwer nie jest uruchomiony")
+            raise
+        except s.error as e:
+            print(f"Błąd podczas łączenia z serwerem: {e}")
+            raise
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        #Zamknij połączenie
+        if self.client_socket:
+            self.client_socket.close()
+            print("Połączenie z serwerem zostaje zamkniete")
+
+    def send_command(self):
+        try:
+            command = input("podaj komendę: ")
+            if command:
+                command = command.lower()
+            self.client_socket.send(command.encode("utf-8"))
+        except ConnectionResetError as e:
+            print(f"Błąd połączenia: {e}. Serwer mógł zostać zamknięty.")
+        except Exception as e:
+            print(f"Inny błąd podczas wysyłania komendy: {e}")
+
+    def recv_response(self):
+        try:
+            response = self.client_socket.recv(1024).decode("utf-8")
+            if not response:  # Sprawdzenie, czy odpowiedź jest pusta
+                print("Brak danych do odebrania.")
+                return None
+            return response
+        except ConnectionResetError as e:
+            print(f"Błąd połączenia: {e}. Serwer mógł zostać zamknięty.")
+        except Exception as e:
+            print(f"Błąd podczas odbierania odpowiedzi: {e}")
+        
+    def print_response(self, response):
+            print(response)
+        
+class DbManager():
+    def __init__(self):
+        self.db = 'db.json'
+
+    def add_record(self, record):
+        try:
+            with open(self.db, 'w', encoding='utf-8') as f:
+                json.dump(record, f, ensure_ascii=False, indent=4)
+        except PermissionError:
+            print(f"Brak uprawnień do zapisu pliku {self.db}")
+        except IOError as e:
+            print(f"Błąd podczas zapisu do pliku: {e}")
+
+====================
+FILE: server.py
+from lib import ServerManager
+from lib import DbManager
+import socket as s
+
+
+with ServerManager() as server:
+    try:
+        #print(f"server : {server}") # server to instancja klasy ServerManager
+        client_socket, adress = server.server_socket.accept()  # metoda accept musi działać na sokecie dlatego jest server_socket
+        db = DbManager()
+
+        while True:
+            try:
+                command = client_socket.recv(1024).decode("utf-8")
+                if command == "stop": 
+                    response =  server.stop_client(client_socket) # te metody działa na instancji klasy Server_Manager
+                    client_socket.send(response.encode("utf-8"))
+                    break 
+                elif command in server.command_map: 
+                    response = server.command_map[command]()
+                else:
+                    response =  server.get_message()
+                #print(command)
+                db.add_record (response)  
+                client_socket.send(response.encode("utf-8"))
+
+            except ConnectionResetError:
+                print("Klient nieoczekiwanie zakończył połączenie")
+                break
+
+            except Exception as e:
+                print(f"Błąd podczas obsługi klienta: {e}")
+                break
+
+    except Exception as e:
+        print(f"Błąd podczas akceptowania połączenia: {e}")    
+        
+

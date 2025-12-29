@@ -1,0 +1,28 @@
+{
+    "users": [
+        {
+            "id": 1737671320994,
+            "username": "anna",
+            "role": "admin",
+            "password": "$2b$12$b.UhoEsUR6MbhtwAAO1kTurIUiE0phos5sNkbL/453IvHzp7wPEEW",
+            "login_time": "2025-01-27T23:29:43.992232",
+            "create_time": "2025-01-23T23:28:40.994539"
+        },
+        {
+            "id": 1737672185528,
+            "username": "magda",
+            "role": "admin",
+            "password": "$2b$12$9ofqu7vmOhbWqmoDKyiode8Vv4yv6PkAkgmFQJTN2JjxTWJ8e2Q7m",
+            "login_time": "2025-01-27T23:12:53.469092",
+            "create_time": "2025-01-23T23:43:05.528013"
+        },
+        {
+            "id": 1737672196996,
+            "username": "iza",
+            "role": "user",
+            "password": "$2b$12$ZJIx6NN9/I4jXke4UlEukufE4Y19XQo2Ml3oWgRBIS705FS2SpcZO",
+            "login_time": null,
+            "create_time": "2025-01-23T23:43:16.996427"
+        }
+    ]
+}
