@@ -2,7 +2,7 @@ from BLL.CommandFactory import CommandFactory
 from Models.MessageProtocol import RequestDTO, MessageProtocol
 
 class ClientCommandFactory(CommandFactory):
-    """Manager dla strony klienta - tworzy żądania do wysłania na serwer"""
+    """Manager sss dla strony klienta - tworzy żądania do wysłania na serwer"""
     
     def __init__(self):
         super().__init__()
